@@ -22,7 +22,7 @@ contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20Burnabl
     function initialize(
         Reserve _tokenReserve,
         string memory _tokenName,
-        string memory _tokenSymbol,
+        string memory _tokenSymbol
     ) initializer public {
         __ERC20_init(_tokenName, _tokenSymbol);
         __ERC20Burnable_init();
@@ -63,4 +63,14 @@ contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20Burnabl
     onlyRole(UPGRADER_ROLE)
     override
     {}
+
+    function mintSynth(address minter, uint amount) onlyRole(MINTER_ROLE) {
+        mint(minter, amount);
+        reserve.addUserDebt(amount);
+    }
+
+    function burnSynth(address minter, uint amount) onlyRole(MINTER_ROLE) {
+        burnFrom(minter, amount);
+        reserve.reduceUserDebt(amount);
+    }
 }
