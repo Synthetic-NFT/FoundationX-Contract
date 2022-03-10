@@ -5,6 +5,7 @@ import "./interfaces/IReserve.sol";
 
 contract Reserve is IReserve {
     mapping(address => uint) minterDebtBalance;
+    mapping(address => uint) minterDepositBalance;
 
     uint minCollateralRatio;
 
@@ -33,6 +34,20 @@ contract Reserve is IReserve {
 
     function getMinterDebt(address minter) internal returns(uint userDebt) {
         uint userDebt = minterDebtBalance[minter];
+    }
+
+    function addMinterDeposit(address minter, uint amount) internal returns(bool) {
+        minterDepositBalance[minter] += amount;
+        return true;
+    }
+
+    function reduceMinterDeposit(address minter, uint amount) internal returns(bool) {
+        minterDepositBalance[minter] -= amount;
+        return true;
+    }
+
+    function getMinterDeposit(address minter) internal returns(uint userDeposit) {
+        uint userDeposit = minterDepositBalance[minter];
     }
 
 }

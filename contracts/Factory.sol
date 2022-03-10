@@ -31,9 +31,13 @@ contract Factory is IFactory {
 //        return true;
 //    }
 
-    function userDepositEther() public payable returns (bool) {
+    function userDepositEther(byte32 synthName) public payable returns (bool) {
+        Synth synth = availableSynthsByName[synthName];
+        require(address(synthAddress)!=address(0), "Synth not available");
         require(msg.sender.balance<=msg.value, "User does not have enough ETH");
-        vault[msg.sender] += msg.value;
+        address(this).transfer(msg.value);
+//        vault[msg.sender] += msg.value;
+        synth.addMinterDeposit(msg.sender, msg.value);
         return true;
     }
 
@@ -49,7 +53,7 @@ contract Factory is IFactory {
             uint collateralRatio = 0;
         }
         else {
-            uint userEthDeposited = vault[minter];
+            uint userEthDeposited = synth.getMinterDeposit(minter);
             uint collateralRatio =  userEthDeposited.divideDecimalRound(synthPrice.multiplyDecimalRound(userDebtOfSynth));
         }
     }
@@ -60,7 +64,7 @@ contract Factory is IFactory {
         uint diffCollateralRatio = userCollateralRatio - minCollateralRatio;
         require(diffCollateralRatio>0, "User under-collateralized!");
         uint synthToEthPrice = getSynthPriceToEth(synth);
-        uint userDepositAmount = vault[minter];
+        uint userDepositAmount = synth.getMinterDeposit(minter);
         return userDepositAmount.divideDecimalRound(diffCollateralRatio.multiplyDecimalRound(synthToEthPrice));
     }
 
@@ -69,7 +73,6 @@ contract Factory is IFactory {
         require(address(synthAddress)!=address(0), "Synth not available");
         uint remainingMintableAmount = remainingMintableSynth(msg.sender, synth);
         require(remainingMintableAmount>amount, "Not enough mintable synth remained");
-        address(this).transfer(amount);
         synth.mintSynth(msg.sender, amount);
         return true;
     }
@@ -81,8 +84,9 @@ contract Factory is IFactory {
 
         uint userCollateralRatio = getMinterCollateralRatio(minter, synth);
         uint synthPrice = getSynthPriceToEth(synth);
-        msg.sender.transfer(userCollateralRatio * amount * synthPrice);
-
+        uint transferAmount = userCollateralRatio * amount * synthPrice;
+        msg.sender.transfer(transferAmount);
+        synth.reduceMinterDeposit(msg.sender, transferAmount);
         return true;
     }
     function userLiquidate() public;
