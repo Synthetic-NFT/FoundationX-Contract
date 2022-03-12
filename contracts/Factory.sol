@@ -11,7 +11,6 @@ contract Factory is IFactory {
     using SafeMath for uint;
     using SafeDecimalMath for uint;
 
-    mapping(address => uint) vault;
     mapping(byte32 => Synth) availableSynthsByName;
 
     event Received(address, uint);
@@ -89,5 +88,10 @@ contract Factory is IFactory {
         synth.reduceMinterDeposit(msg.sender, transferAmount);
         return true;
     }
-    function userLiquidate() public;
+
+    function userLiquidate(Synth synth, address account, uint synthAmount) public payable returns(bool) {
+        (uint totalRedeemed, uint amountToLiquidate) = synth.liquidateDelinquentAccount(account, synthAmount, msg.sender);
+        address(synth).transfer(msg.sender, totalRedeemed);
+        return true;
+    }
 }
