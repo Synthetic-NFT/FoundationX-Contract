@@ -32,6 +32,12 @@ contract Liquidation is Reserve, AccessControlUpgradeable, UUPSUpgradeable {
         discountRate = _discountRate;
     }
 
+    function _authorizeUpgrade(address newImplementation)
+        internal
+        onlyRole(UPGRADER_ROLE)
+        override
+    {}
+
     // Views
     function isOpenForLiquidation(address account) public view returns (bool) {
         return liquidatableUsers[account]>0;
@@ -58,6 +64,8 @@ contract Liquidation is Reserve, AccessControlUpgradeable, UUPSUpgradeable {
         }
     }
 
+
+
     /**
      * r = target issuance ratio
      * D = debt balance in ETH
@@ -75,57 +83,7 @@ contract Liquidation is Reserve, AccessControlUpgradeable, UUPSUpgradeable {
         return dividend.divideDecimal(divisor);
     }
 
-    function liquidateDelinquentAccount(
-        address account,
-        uint synthAmount,
-        address liquidator
-    ) external  returns (uint totalRedeemed, uint amountToLiquidate) {
-        // Check account is liquidation open
-        require(isOpenForLiquidation(account), "Account not open for liquidation");
 
-        // require liquidator has enough sUSD
-        require(IERC20(address(super)).balanceOf(liquidator) >= synthAmount, "Not enough synthNFTs");
-
-        uint liquidationPenalty = getDiscountRate();
-
-        // What is their debt in ETH?
-        uint synthPrice = super.getSynthPriceToEth();
-        uint amountSynthDebt = super.getMinterDebt(account);
-        uint debtBalance = synthPrice * amountSynthDebt;
-        uint liquidateSynthEthValue = synthPrice * synthAmount;
-
-
-        uint collateralForAccount = super.getMinterDeposit(account);
-        uint amountToFixCollateralRatio = calculateAmountToFixCollateral(debtBalance, collateralForAccount);
-
-        // Cap amount to liquidate to repair collateral ratio based on issuance ratio
-        amountToLiquidate = amountToFixCollateralRatio < liquidateSynthEthValue ? amountToFixCollateralRatio : liquidateSynthEthValue;
-
-        // what's the equivalent amount of synth for the amountToLiquidate?
-        uint synthLiquidated = amountToLiquidate.divideDecimalRound(synthPrice);
-
-        // Add penalty
-        totalRedeemed = synthLiquidated.multiplyDecimal(SafeDecimalMath.unit().add(liquidationPenalty));
-
-        // if total SNX to redeem is greater than account's collateral
-        // account is under collateralised, liquidate all collateral and reduce sUSD to burn
-        if (totalRedeemed > collateralForAccount) {
-            // set totalRedeemed to all transferable collateral
-            totalRedeemed = collateralForAccount;
-
-            // whats the equivalent sUSD to burn for all collateral less penalty
-            synthLiquidated = totalRedeemed.divideDecimal(SafeDecimalMath.unit().add(liquidationPenalty)).divideDecimal(synthPrice);
-        }
-
-        // burn sUSD from messageSender (liquidator) and reduce account's debt
-        super.burnSynth(account, liquidator, synthLiquidated);
-        super.reduceMinterDeposit(account, totalRedeemed);
-    // Remove liquidation flag if amount liquidated fixes ratio
-        if (amountToLiquidate == amountToFixCollateralRatio) {
-            // Remove liquidation
-            removeAccountInLiquidation(account);
-        }
-    }
 
     // owner only
     // TODO: implement this function

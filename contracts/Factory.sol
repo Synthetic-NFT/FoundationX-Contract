@@ -34,7 +34,7 @@ contract Factory is IFactory {
         Synth synth = availableSynthsByName[synthName];
         require(address(synth)!=address(0), "Synth not available");
         require(msg.sender.balance<=msg.value, "User does not have enough ETH");
-        address(this).transfer(msg.value);
+        payable(this).transfer(msg.value);
 //        vault[msg.sender] += msg.value;
         synth.addMinterDeposit(msg.sender, msg.value);
         return true;
@@ -49,15 +49,15 @@ contract Factory is IFactory {
         uint userDebtOfSynth = synth.getMinterDebt(minter);
 
         if (userDebtOfSynth == 0) {
-            uint collateralRatio = 0;
+            collateralRatio = 0;
         }
         else {
             uint userEthDeposited = synth.getMinterDeposit(minter);
-            uint collateralRatio =  userEthDeposited.divideDecimalRound(synthPrice.multiplyDecimalRound(userDebtOfSynth));
+            collateralRatio =  userEthDeposited.divideDecimalRound(synthPrice.multiplyDecimalRound(userDebtOfSynth));
         }
     }
 
-    function remainingMintableSynth(address minter, Synth synth) public {
+    function remainingMintableSynth(address minter, Synth synth) public returns(uint){
         uint userCollateralRatio = getMinterCollateralRatio(minter, synth);
         uint minCollateralRatio = synth.getMinCollateralRatio();
         uint diffCollateralRatio = userCollateralRatio - minCollateralRatio;
@@ -79,19 +79,19 @@ contract Factory is IFactory {
         Synth synth = availableSynthsByName[synthName];
         require(address(synth)!=address(0), "Synth not available");
         require(synth.getMinterDebt(msg.sender)>amount, "Expected burning amount exceeds user debt");
-        synth.burnSynth(msg.sender, amount);
+        synth.burnSynth(msg.sender, msg.sender, amount);
 
         uint userCollateralRatio = getMinterCollateralRatio(msg.sender, synth);
         uint synthPrice = getSynthPriceToEth(synth);
         uint transferAmount = userCollateralRatio * amount * synthPrice;
-        msg.sender.transfer(transferAmount);
+        payable(msg.sender).transfer(transferAmount);
         synth.reduceMinterDeposit(msg.sender, transferAmount);
         return true;
     }
 
     function userLiquidate(Synth synth, address account, uint synthAmount) public payable returns(bool) {
         (uint totalRedeemed, uint amountToLiquidate) = synth.liquidateDelinquentAccount(account, synthAmount, msg.sender);
-        address(synth).transfer(msg.sender, totalRedeemed);
+        payable(msg.sender).transfer(totalRedeemed);
         return true;
     }
 }
