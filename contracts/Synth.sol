@@ -12,10 +12,10 @@ import "./interfaces/ISynth.sol";
 import "./Reserve.sol";
 import "./Liquidation.sol";
 
-contract Synth is ISynth, Reserve, Liquidation, Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable {
+contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable, Liquidation {
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+    uint256 totalDebtIssued;
 //    Reserve tokenReserve;
 //    Liquidation liquidation;
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -25,7 +25,7 @@ contract Synth is ISynth, Reserve, Liquidation, Initializable, ERC20Upgradeable,
 //        Reserve _tokenReserve,
 //        Liquidation _liquidation,
         string memory _tokenName,
-        string memory _tokenSymbol,
+        string memory _tokenSymbol
     ) initializer public {
         __ERC20_init(_tokenName, _tokenSymbol);
         __ERC20Burnable_init();
@@ -50,7 +50,7 @@ contract Synth is ISynth, Reserve, Liquidation, Initializable, ERC20Upgradeable,
         _unpause();
     }
 
-    function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
+    function mint(address to, uint256 amount) public override onlyRole(MINTER_ROLE) {
         _mint(to, amount);
     }
 
@@ -67,6 +67,8 @@ contract Synth is ISynth, Reserve, Liquidation, Initializable, ERC20Upgradeable,
     onlyRole(UPGRADER_ROLE)
     override
     {}
+
+    function _removeFromDebtRegister(address debtAccount, uint amountBurnt, uint existingDebt, uint totalDebtIssued) internal onlyRole(MINTER_ROLE) {}
 
 //    function getSynthPriceToEth() public returns (uint synthPrice){
 //        uint synthPrice = 100;
@@ -85,18 +87,19 @@ contract Synth is ISynth, Reserve, Liquidation, Initializable, ERC20Upgradeable,
 //        }
 //    }
 
+    // TODO: replace this with Oracle
     function getSynthPriceToEth() public returns (uint synthPrice){
         synthPrice = 100;
     }
 
-    function mintSynth(address minter, uint amount) onlyRole(MINTER_ROLE) {
+    function mintSynth(address minter, uint amount) public onlyRole(MINTER_ROLE) {
         mint(minter, amount);
         addMinterDebt(minter, amount);
     }
 
-    function burnSynth(address debtAccount, address burnAccount, uint amount) onlyRole(MINTER_ROLE) {
+    function burnSynth(address debtAccount, address burnAccount, uint amount) public onlyRole(MINTER_ROLE) {
         uint existingDebt = getMinterDebt(debtAccount);
-        amountBurnt = existingDebt < amount ? existingDebt : amount;
+        uint amountBurnt = existingDebt < amount ? existingDebt : amount;
 
         // Remove liquidated debt from the ledger
         _removeFromDebtRegister(debtAccount, amountBurnt, existingDebt, totalDebtIssued);
@@ -105,7 +108,7 @@ contract Synth is ISynth, Reserve, Liquidation, Initializable, ERC20Upgradeable,
         burn(burnAccount, amountBurnt);
 
         // Account for the burnt debt in the cache.
-        reduceMinterDebt(minter, amount);
+        reduceMinterDebt(debtAccount, amount);
     }
 
 

@@ -11,7 +11,7 @@ contract Factory is IFactory {
     using SafeMath for uint;
     using SafeDecimalMath for uint;
 
-    mapping(byte32 => Synth) availableSynthsByName;
+    mapping(bytes32 => Synth) availableSynthsByName;
 
     event Received(address, uint);
     receive() external payable {
@@ -30,9 +30,9 @@ contract Factory is IFactory {
 //        return true;
 //    }
 
-    function userDepositEther(byte32 synthName) public payable returns (bool) {
+    function userDepositEther(bytes32 synthName) public payable returns (bool) {
         Synth synth = availableSynthsByName[synthName];
-        require(address(synthAddress)!=address(0), "Synth not available");
+        require(address(synth)!=address(0), "Synth not available");
         require(msg.sender.balance<=msg.value, "User does not have enough ETH");
         address(this).transfer(msg.value);
 //        vault[msg.sender] += msg.value;
@@ -67,21 +67,21 @@ contract Factory is IFactory {
         return userDepositAmount.divideDecimalRound(diffCollateralRatio.multiplyDecimalRound(synthToEthPrice));
     }
 
-    function userMintSynth(byte32 synthName, uint amount) public payable returns (bool) {
+    function userMintSynth(bytes32 synthName, uint amount) public payable returns (bool) {
         Synth synth = availableSynthsByName[synthName];
-        require(address(synthAddress)!=address(0), "Synth not available");
+        require(address(synth)!=address(0), "Synth not available");
         uint remainingMintableAmount = remainingMintableSynth(msg.sender, synth);
         require(remainingMintableAmount>amount, "Not enough mintable synth remained");
         synth.mintSynth(msg.sender, amount);
         return true;
     }
-    function userBurnSynth(byte32 synthName, uint amount) public payable returns(bool) {
+    function userBurnSynth(bytes32 synthName, uint amount) public payable returns(bool) {
         Synth synth = availableSynthsByName[synthName];
-        require(address(synthAddress)!=address(0), "Synth not available");
+        require(address(synth)!=address(0), "Synth not available");
         require(synth.getMinterDebt(msg.sender)>amount, "Expected burning amount exceeds user debt");
         synth.burnSynth(msg.sender, amount);
 
-        uint userCollateralRatio = getMinterCollateralRatio(minter, synth);
+        uint userCollateralRatio = getMinterCollateralRatio(msg.sender, synth);
         uint synthPrice = getSynthPriceToEth(synth);
         uint transferAmount = userCollateralRatio * amount * synthPrice;
         msg.sender.transfer(transferAmount);

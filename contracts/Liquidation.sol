@@ -3,13 +3,16 @@ pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./libraries/SafeDecimalMath.sol";
+import "./Reserve.sol";
 
-contract Liquidation is AccessControlUpgradeable, UUPSUpgradeable {
+contract Liquidation is Reserve, AccessControlUpgradeable, UUPSUpgradeable {
     using SafeMath for uint;
     using SafeDecimalMath for uint;
 
     uint256 liquidationDelay;
+    uint256 liquidationPenalty;
     mapping(address => uint256) liquidatableUsers;
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     uint discountRate;
@@ -30,19 +33,19 @@ contract Liquidation is AccessControlUpgradeable, UUPSUpgradeable {
     }
 
     // Views
-    function isOpenForLiquidation(address account) external view returns (bool) {
-        return liquidatableUsers[accound]>0;
+    function isOpenForLiquidation(address account) public view returns (bool) {
+        return liquidatableUsers[account]>0;
     }
-    function getDiscountRate() external view returns (bool) {
+    function getDiscountRate() public view returns (uint) {
         return discountRate;
     }
     // Mutative Functions
     function flagAccountForLiquidation(address account) external {
-        liquidatableUsers[account]=true;
+        liquidatableUsers[account]=1;
     }
 
     // Restricted: used internally to Synthetix contracts
-    function removeAccountInLiquidation(address account) external {
+    function removeAccountInLiquidation(address account) public {
         if(liquidatableUsers[account]>0) {
             delete liquidatableUsers[account];
         }
@@ -50,7 +53,7 @@ contract Liquidation is AccessControlUpgradeable, UUPSUpgradeable {
 
     function checkAndRemoveAccountInLiquidation(address account) external {
         require(liquidatableUsers[account]>0, "User has not liquidation open");
-        if (super.getMinterCollateralRatio(account)>super.getMinCollateralRatio()) {
+        if (Reserve.getMinterCollateralRatio(account)> Reserve.getMinCollateralRatio()) {
             removeAccountInLiquidation(account);
         }
     }
@@ -62,8 +65,8 @@ contract Liquidation is AccessControlUpgradeable, UUPSUpgradeable {
      * P = liquidation penalty, AKA discount ratio
      * Calculates amount of synths = (D - V * r) / (1 - (1 + P) * r)
      */
-    function calculateAmountToFixCollateral(uint debtBalance, uint collateral) external view returns (uint) {
-        uint ratio = super.getMinCollateralRatio();
+    function calculateAmountToFixCollateral(uint debtBalance, uint collateral) public view returns (uint) {
+        uint ratio = Reserve.getMinCollateralRatio();
         uint unit = SafeDecimalMath.unit();
 
         uint dividend = debtBalance.sub(collateral.multiplyDecimal(ratio));
@@ -116,19 +119,29 @@ contract Liquidation is AccessControlUpgradeable, UUPSUpgradeable {
 
         // burn sUSD from messageSender (liquidator) and reduce account's debt
         super.burnSynth(account, liquidator, synthLiquidated);
-        super.reduceMinterDeposit(minter, totalRedeemed);
+        super.reduceMinterDeposit(account, totalRedeemed);
     // Remove liquidation flag if amount liquidated fixes ratio
-        if (amountToLiquidate == amountToFixRatio) {
+        if (amountToLiquidate == amountToFixCollateralRatio) {
             // Remove liquidation
             removeAccountInLiquidation(account);
         }
     }
 
     // owner only
-    function setLiquidationDelay(uint time) external;
+    // TODO: implement this function
+    function setLiquidationDelay(uint time) external {
+    }
 
-    function setLiquidationRatio(uint liquidationRatio) external;
+    // TODO: implement this function
+    function setLiquidationRatio(uint liquidationRatio) external {
 
-    function setLiquidationPenalty(uint penalty) external;
+    }
 
+    function setLiquidationPenalty(uint penalty) external {
+        liquidationPenalty = penalty;
+    }
+
+    function getLiquidationPenalty() public view returns (uint) {
+        return liquidationPenalty;
+    }
 }

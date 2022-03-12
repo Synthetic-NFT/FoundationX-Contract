@@ -3,7 +3,7 @@ pragma solidity ^0.8.4;
 
 import "./interfaces/IReserve.sol";
 
-contract Reserve is IReserve {
+abstract contract Reserve is IReserve {
     mapping(address => uint) minterDebtBalance;
     mapping(address => uint) minterDepositBalance;
 
