@@ -42,7 +42,7 @@ contract Factory is IFactory {
     }
 
     function getSynthPriceToEth(Synth synth) public returns (uint synthPrice){
-        uint synthPrice = 100;
+        synthPrice = synth.getSynthPriceToEth();
     }
 
     function getMinterCollateralRatio(address minter, Synth synth) public returns (uint collateralRatio) {
@@ -90,5 +90,4 @@ contract Factory is IFactory {
         return true;
     }
     function userLiquidate() public;
-
 }
