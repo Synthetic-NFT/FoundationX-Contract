@@ -1,6 +1,5 @@
 import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
-import { generateRandomAddress } from "./shared/address";
 import { Liquidation, MockOralce, SafeDecimalMath, Synth } from "../typechain";
 import { beforeEach, describe, it } from "mocha";
 
@@ -54,33 +53,38 @@ describe("Synth", function () {
     const minCollateralRatio = BigNumber.from(150).mul(unit).div(100);
     await setUp(liquidationPenalty, minCollateralRatio);
 
-    const randomAddress1 = generateRandomAddress();
-    const randomAddress2 = generateRandomAddress();
+    const [owner, signer1, signer2] = await ethers.getSigners();
 
-    await synth.mintSynth(randomAddress1, BigNumber.from(10).mul(unit));
-    await synth.mintSynth(randomAddress2, BigNumber.from(20).mul(unit));
+    await synth.mintSynth(signer1.address, BigNumber.from(10).mul(unit));
+    await synth.mintSynth(signer2.address, BigNumber.from(20).mul(unit));
 
     const assertBalance = async function (address: string, balance: BigNumber) {
       expect(await synth.getMinterDebt(address)).to.equal(balance);
       expect(await synth.balanceOf(address)).to.equal(balance);
     };
 
-    await assertBalance(randomAddress1, BigNumber.from(10).mul(unit));
-    await assertBalance(randomAddress2, BigNumber.from(20).mul(unit));
+    await assertBalance(signer1.address, BigNumber.from(10).mul(unit));
+    await assertBalance(signer2.address, BigNumber.from(20).mul(unit));
     expect(await synth.totalSupply()).to.equal(BigNumber.from(30).mul(unit));
 
+    await synth
+      .connect(signer1)
+      .approve(owner.address, BigNumber.from(5).mul(unit));
+    await synth
+      .connect(signer2)
+      .approve(owner.address, BigNumber.from(25).mul(unit));
     await synth.burnSynth(
-      randomAddress1,
-      randomAddress1,
+      signer1.address,
+      signer1.address,
       BigNumber.from(5).mul(unit)
     );
     await synth.burnSynth(
-      randomAddress2,
-      randomAddress2,
+      signer2.address,
+      signer2.address,
       BigNumber.from(25).mul(unit)
     );
-    await assertBalance(randomAddress1, BigNumber.from(5).mul(unit));
-    await assertBalance(randomAddress2, BigNumber.from(0).mul(unit));
+    await assertBalance(signer1.address, BigNumber.from(5).mul(unit));
+    await assertBalance(signer2.address, BigNumber.from(0).mul(unit));
     expect(await synth.totalSupply()).to.equal(BigNumber.from(5).mul(unit));
   });
 

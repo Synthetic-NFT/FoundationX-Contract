@@ -1,8 +1,8 @@
 import { ethers } from "ethers";
 import * as crypto from "crypto";
 
-export function generateRandomAddress(): string {
+export function generateRandomAddress(): [string, string] {
   const privateKey = "0x" + crypto.randomBytes(32).toString("hex");
   const wallet = new ethers.Wallet(privateKey);
-  return wallet.address;
+  return [wallet.address, wallet.privateKey];
 }

@@ -88,8 +88,7 @@ contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20Burnabl
         uint amountBurnt = existingDebt < amount ? existingDebt : amount;
 
         // synth.burn does a safe subtraction on balance (so it will revert if there are not enough synths).
-        // TODO: check to see if we should replace this with burnFrom in ERC20Upgradeable.sol
-        _burn(burnAccount, amountBurnt);
+        burnFrom(burnAccount, amountBurnt);
 
         // Account for the burnt debt in the cache.
         reduceMinterDebt(debtAccount, amountBurnt);

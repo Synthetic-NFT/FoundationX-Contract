@@ -23,7 +23,7 @@ describe("Liquidation", function () {
   });
 
   it("Set and unset liquidation", async function () {
-    const randomAddress1 = generateRandomAddress();
+    const [randomAddress1, _] = generateRandomAddress();
     expect(await liquidation.isOpenForLiquidation(randomAddress1)).to.equal(
       false
     );
