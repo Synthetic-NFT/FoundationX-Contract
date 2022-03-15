@@ -11,6 +11,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "./interfaces/ISynth.sol";
 import "./Reserve.sol";
 import "./Liquidation.sol";
+import "./interfaces/IOracle.sol";
 
 contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable {
     using SafeMath for uint;
@@ -21,15 +22,16 @@ contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20Burnabl
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     Liquidation liquidation;
-    uint256 totalDebtIssued;
-    //    Reserve tokenReserve;
-    //    Liquidation liquidation;
+    IOracle oracle;
+    string tokenName;
+    string tokenSymbol;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
     function initialize(
-    //        Reserve _tokenReserve,
         Liquidation _liquidation,
+        IOracle _oracle,
         string memory _tokenName,
         string memory _tokenSymbol
     ) initializer public {
@@ -44,8 +46,10 @@ contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20Burnabl
         _grantRole(MINTER_ROLE, msg.sender);
         _grantRole(UPGRADER_ROLE, msg.sender);
 
-        //        tokenReserve = _tokenReserve;
         liquidation = _liquidation;
+        oracle = _oracle;
+        tokenName = _tokenName;
+        tokenSymbol = _tokenSymbol;
     }
 
     function pause() public onlyRole(PAUSER_ROLE) {
@@ -54,10 +58,6 @@ contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20Burnabl
 
     function unpause() public onlyRole(PAUSER_ROLE) {
         _unpause();
-    }
-
-    function mint(address to, uint256 amount) public override onlyRole(MINTER_ROLE) {
-        _mint(to, amount);
     }
 
     function _beforeTokenTransfer(address from, address to, uint256 amount)
@@ -74,31 +74,12 @@ contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20Burnabl
     override
     {}
 
-
-    //    function getSynthPriceToEth() public returns (uint synthPrice){
-    //        uint synthPrice = 100;
-    //    }
-    //
-    //    function getMinterCollateralRatio(address minter) public returns (uint collateralRatio) {
-    //        uint synthPrice = getSynthPriceToEth();
-    //        uint userDebtOfSynth = getMinterDebt(minter);
-    //
-    //        if (userDebtOfSynth == 0) {
-    //            uint collateralRatio = 0;
-    //        }
-    //        else {
-    //            uint userEthDeposited = this.getMinterDeposit(minter);
-    //            uint collateralRatio =  userEthDeposited.divideDecimalRound(synthPrice.multiplyDecimalRound(userDebtOfSynth));
-    //        }
-    //    }
-
-    // TODO: replace this with Oracle
     function getSynthPriceToEth() public returns (uint synthPrice){
-        synthPrice = 100;
+        synthPrice = oracle.getAssetPrice(tokenName);
     }
 
     function mintSynth(address minter, uint amount) public onlyRole(MINTER_ROLE) {
-        mint(minter, amount);
+        _mint(minter, amount);
         addMinterDebt(minter, amount);
     }
 
