@@ -1,9 +1,9 @@
-import {expect} from "chai";
-import {ethers, upgrades} from "hardhat";
-import {generateRandomAddress} from "./shared/address";
-import {Liquidation, SafeDecimalMath} from "../typechain";
-import {beforeEach} from "mocha";
-import {closeBigNumber} from "./shared/math";
+import { expect } from "chai";
+import { ethers, upgrades } from "hardhat";
+import { generateRandomAddress } from "./shared/address";
+import { Liquidation, SafeDecimalMath } from "../typechain";
+import { beforeEach } from "mocha";
+import { closeBigNumber } from "./shared/math";
 
 const { BigNumber } = ethers;
 
