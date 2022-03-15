@@ -69,7 +69,6 @@ describe("Liquidation", function () {
     const expectAmoutToFix = BigNumber.from(2285714)
       .mul(unit)
       .div(Math.pow(10, precision));
-    console.log(amountToFix, expectAmoutToFix);
     expect(
       closeBigNumber(
         amountToFix,
