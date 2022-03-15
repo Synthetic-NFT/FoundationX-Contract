@@ -22,13 +22,13 @@ contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20Burnabl
 
     Liquidation liquidation;
     uint256 totalDebtIssued;
-//    Reserve tokenReserve;
-//    Liquidation liquidation;
+    //    Reserve tokenReserve;
+    //    Liquidation liquidation;
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
     function initialize(
-//        Reserve _tokenReserve,
+    //        Reserve _tokenReserve,
         Liquidation _liquidation,
         string memory _tokenName,
         string memory _tokenSymbol
@@ -44,7 +44,7 @@ contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20Burnabl
         _grantRole(MINTER_ROLE, msg.sender);
         _grantRole(UPGRADER_ROLE, msg.sender);
 
-//        tokenReserve = _tokenReserve;
+        //        tokenReserve = _tokenReserve;
         liquidation = _liquidation;
     }
 
@@ -75,22 +75,22 @@ contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20Burnabl
     {}
 
 
-//    function getSynthPriceToEth() public returns (uint synthPrice){
-//        uint synthPrice = 100;
-//    }
-//
-//    function getMinterCollateralRatio(address minter) public returns (uint collateralRatio) {
-//        uint synthPrice = getSynthPriceToEth();
-//        uint userDebtOfSynth = getMinterDebt(minter);
-//
-//        if (userDebtOfSynth == 0) {
-//            uint collateralRatio = 0;
-//        }
-//        else {
-//            uint userEthDeposited = this.getMinterDeposit(minter);
-//            uint collateralRatio =  userEthDeposited.divideDecimalRound(synthPrice.multiplyDecimalRound(userDebtOfSynth));
-//        }
-//    }
+    //    function getSynthPriceToEth() public returns (uint synthPrice){
+    //        uint synthPrice = 100;
+    //    }
+    //
+    //    function getMinterCollateralRatio(address minter) public returns (uint collateralRatio) {
+    //        uint synthPrice = getSynthPriceToEth();
+    //        uint userDebtOfSynth = getMinterDebt(minter);
+    //
+    //        if (userDebtOfSynth == 0) {
+    //            uint collateralRatio = 0;
+    //        }
+    //        else {
+    //            uint userEthDeposited = this.getMinterDeposit(minter);
+    //            uint collateralRatio =  userEthDeposited.divideDecimalRound(synthPrice.multiplyDecimalRound(userDebtOfSynth));
+    //        }
+    //    }
 
     // TODO: replace this with Oracle
     function getSynthPriceToEth() public returns (uint synthPrice){
@@ -117,14 +117,14 @@ contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20Burnabl
         address account,
         uint synthAmount,
         address liquidator
-    ) external  returns (uint totalRedeemed, uint amountToLiquidate) {
+    ) external returns (uint totalRedeemed, uint amountToLiquidate) {
         // Check account is liquidation open
         require(liquidation.isOpenForLiquidation(account), "Account not open for liquidation");
 
         // require liquidator has enough sUSD
         require(IERC20(address(this)).balanceOf(liquidator) >= synthAmount, "Not enough synthNFTs");
 
-        uint liquidationPenalty = liquidation.getDiscountRate();
+        uint liquidationPenalty = liquidation.getLiquidationPenalty();
 
         // What is their debt in ETH?
         uint synthPrice = getSynthPriceToEth();

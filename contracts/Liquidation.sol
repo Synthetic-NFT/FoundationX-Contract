@@ -11,60 +11,53 @@ contract Liquidation is Reserve, AccessControlUpgradeable, UUPSUpgradeable {
     using SafeMath for uint;
     using SafeDecimalMath for uint;
 
-    uint256 liquidationDelay;
     uint256 liquidationPenalty;
-    mapping(address => uint256) liquidatableUsers;
+    mapping(address => bool) liquidatableUsers;
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
-    uint discountRate;
-
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-    function initialize(uint _discountRate, uint256 _liquidationDelay) initializer public {
+    function initialize(uint256 _liquidationPenalty, uint256 _minCollateralRatio) initializer public {
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(UPGRADER_ROLE, msg.sender);
 
-        liquidationDelay = _liquidationDelay;
-        discountRate = _discountRate;
+        require(_minCollateralRatio >= _liquidationPenalty.add(SafeDecimalMath.UNIT), "Invalid liquidation penalty and min collateral ratio");
+        setMinCollateralRatio(_minCollateralRatio);
+        setLiquidationPenalty(_liquidationPenalty);
     }
 
     function _authorizeUpgrade(address newImplementation)
-        internal
-        onlyRole(UPGRADER_ROLE)
-        override
+    internal
+    onlyRole(UPGRADER_ROLE)
+    override
     {}
 
     // Views
     function isOpenForLiquidation(address account) public view returns (bool) {
-        return liquidatableUsers[account]>0;
-    }
-    function getDiscountRate() public view returns (uint) {
-        return discountRate;
+        return liquidatableUsers[account];
     }
     // Mutative Functions
     function flagAccountForLiquidation(address account) external {
-        liquidatableUsers[account]=1;
+        liquidatableUsers[account] = true;
     }
 
     // Restricted: used internally to Synthetix contracts
     function removeAccountInLiquidation(address account) public {
-        if(liquidatableUsers[account]>0) {
+        if (liquidatableUsers[account]) {
             delete liquidatableUsers[account];
         }
     }
 
     function checkAndRemoveAccountInLiquidation(address account) external {
-        require(liquidatableUsers[account]>0, "User has not liquidation open");
-        if (Reserve.getMinterCollateralRatio(account)> Reserve.getMinCollateralRatio()) {
+        require(liquidatableUsers[account], "User has not liquidation open");
+        if (Reserve.getMinterCollateralRatio(account) > Reserve.getMinCollateralRatio()) {
             removeAccountInLiquidation(account);
         }
     }
-
-
 
     /**
      * r = target issuance ratio
@@ -77,25 +70,13 @@ contract Liquidation is Reserve, AccessControlUpgradeable, UUPSUpgradeable {
         uint ratio = Reserve.getMinCollateralRatio();
         uint unit = SafeDecimalMath.unit();
 
-        uint dividend = debtBalance.sub(collateral.multiplyDecimal(ratio));
-        uint divisor = unit.sub(unit.add(getLiquidationPenalty()).multiplyDecimal(ratio));
+        uint dividend = collateral.multiplyDecimal(ratio).sub(debtBalance);
+        uint divisor = unit.add(getLiquidationPenalty()).multiplyDecimal(ratio).sub(unit);
 
         return dividend.divideDecimal(divisor);
     }
 
-
-
-    // owner only
-    // TODO: implement this function
-    function setLiquidationDelay(uint time) external {
-    }
-
-    // TODO: implement this function
-    function setLiquidationRatio(uint liquidationRatio) external {
-
-    }
-
-    function setLiquidationPenalty(uint penalty) external {
+    function setLiquidationPenalty(uint penalty) public {
         liquidationPenalty = penalty;
     }
 
