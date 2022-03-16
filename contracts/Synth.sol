@@ -13,7 +13,7 @@ import "./Reserve.sol";
 import "./Liquidation.sol";
 import "./interfaces/IOracle.sol";
 
-contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable {
+contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable {
     using SafeMath for uint;
     using SafeDecimalMath for uint;
 
@@ -22,6 +22,7 @@ contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20Burnabl
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     Liquidation liquidation;
+    Reserve reserve;
     IOracle oracle;
     string tokenName;
     string tokenSymbol;
@@ -30,6 +31,7 @@ contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20Burnabl
     constructor() initializer {}
 
     function initialize(
+        Reserve _reserve,
         Liquidation _liquidation,
         IOracle _oracle,
         string memory _tokenName,
@@ -46,6 +48,7 @@ contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20Burnabl
         _grantRole(MINTER_ROLE, msg.sender);
         _grantRole(UPGRADER_ROLE, msg.sender);
 
+        reserve = _reserve;
         liquidation = _liquidation;
         oracle = _oracle;
         tokenName = _tokenName;
@@ -80,18 +83,18 @@ contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20Burnabl
 
     function mintSynth(address minter, uint amount) public onlyRole(MINTER_ROLE) {
         _mint(minter, amount);
-        addMinterDebt(minter, amount);
+        reserve.addMinterDebt(minter, amount);
     }
 
     function burnSynth(address debtAccount, address burnAccount, uint amount) public onlyRole(MINTER_ROLE) {
-        uint existingDebt = getMinterDebt(debtAccount);
+        uint existingDebt = reserve.getMinterDebt(debtAccount);
         uint amountBurnt = existingDebt < amount ? existingDebt : amount;
 
         // synth.burn does a safe subtraction on balance (so it will revert if there are not enough synths).
         burnFrom(burnAccount, amountBurnt);
 
         // Account for the burnt debt in the cache.
-        reduceMinterDebt(debtAccount, amountBurnt);
+        reserve.reduceMinterDebt(debtAccount, amountBurnt);
     }
 
     function liquidateDelinquentAccount(
@@ -109,12 +112,12 @@ contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20Burnabl
 
         // What is their debt in ETH?
         uint synthPrice = getSynthPriceToEth();
-        uint amountSynthDebt = getMinterDebt(account);
+        uint amountSynthDebt = reserve.getMinterDebt(account);
         uint debtBalance = synthPrice * amountSynthDebt;
         uint liquidateSynthEthValue = synthPrice * synthAmount;
 
 
-        uint collateralForAccount = getMinterDeposit(account);
+        uint collateralForAccount = reserve.getMinterDeposit(account);
         uint amountToFixCollateralRatio = liquidation.calculateAmountToFixCollateral(debtBalance, collateralForAccount);
 
         // Cap amount to liquidate to repair collateral ratio based on issuance ratio
@@ -138,7 +141,7 @@ contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20Burnabl
 
         // burn sUSD from messageSender (liquidator) and reduce account's debt
         burnSynth(account, liquidator, synthLiquidated);
-        reduceMinterDeposit(account, totalRedeemed);
+        reserve.reduceMinterDeposit(account, totalRedeemed);
         // Remove liquidation flag if amount liquidated fixes ratio
         if (amountToLiquidate == amountToFixCollateralRatio) {
             // Remove liquidation

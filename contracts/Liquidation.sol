@@ -7,26 +7,28 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./libraries/SafeDecimalMath.sol";
 import "./Reserve.sol";
 
-contract Liquidation is Reserve, AccessControlUpgradeable, UUPSUpgradeable {
+
+contract Liquidation is AccessControlUpgradeable, UUPSUpgradeable {
     using SafeMath for uint;
     using SafeDecimalMath for uint;
 
     uint256 liquidationPenalty;
     mapping(address => bool) liquidatableUsers;
+    Reserve reserve;
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-    function initialize(uint256 _liquidationPenalty, uint256 _minCollateralRatio) initializer public {
+    function initialize(Reserve _reserve, uint256 _liquidationPenalty) initializer public {
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(UPGRADER_ROLE, msg.sender);
 
-        require(_minCollateralRatio >= _liquidationPenalty.add(SafeDecimalMath.UNIT), "Invalid liquidation penalty and min collateral ratio");
-        setMinCollateralRatio(_minCollateralRatio);
+        reserve = _reserve;
+        require(reserve.getMinCollateralRatio() >= _liquidationPenalty.add(SafeDecimalMath.UNIT), "Invalid liquidation penalty and min collateral ratio");
         setLiquidationPenalty(_liquidationPenalty);
     }
 
@@ -36,10 +38,10 @@ contract Liquidation is Reserve, AccessControlUpgradeable, UUPSUpgradeable {
     override
     {}
 
-    // Views
     function isOpenForLiquidation(address account) public view returns (bool) {
         return liquidatableUsers[account];
     }
+
     // Mutative Functions
     function flagAccountForLiquidation(address account) external {
         liquidatableUsers[account] = true;
@@ -54,7 +56,7 @@ contract Liquidation is Reserve, AccessControlUpgradeable, UUPSUpgradeable {
 
     function checkAndRemoveAccountInLiquidation(address account) external {
         require(liquidatableUsers[account], "User has not liquidation open");
-        if (Reserve.getMinterCollateralRatio(account) > Reserve.getMinCollateralRatio()) {
+        if (reserve.getMinterCollateralRatio(account) > reserve.getMinCollateralRatio()) {
             removeAccountInLiquidation(account);
         }
     }
@@ -67,7 +69,7 @@ contract Liquidation is Reserve, AccessControlUpgradeable, UUPSUpgradeable {
      * Calculates amount of synths = (D - V * r) / (1 - (1 + P) * r)
      */
     function calculateAmountToFixCollateral(uint debtBalance, uint collateral) public view returns (uint) {
-        uint ratio = Reserve.getMinCollateralRatio();
+        uint ratio = reserve.getMinCollateralRatio();
         uint unit = SafeDecimalMath.unit();
 
         uint dividend = collateral.multiplyDecimal(ratio).sub(debtBalance);
@@ -76,7 +78,7 @@ contract Liquidation is Reserve, AccessControlUpgradeable, UUPSUpgradeable {
         return dividend.divideDecimal(divisor);
     }
 
-    function setLiquidationPenalty(uint penalty) public {
+    function setLiquidationPenalty(uint penalty) public onlyRole(DEFAULT_ADMIN_ROLE) {
         liquidationPenalty = penalty;
     }
 

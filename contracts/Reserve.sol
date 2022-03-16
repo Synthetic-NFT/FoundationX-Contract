@@ -4,17 +4,46 @@ pragma solidity ^0.8.4;
 import "./interfaces/IReserve.sol";
 import "./libraries/SafeDecimalMath.sol";
 
-abstract contract Reserve is IReserve {
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+
+
+contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
+
+    using SafeMath for uint;
     using SafeDecimalMath for uint;
+
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     mapping(address => uint) minterDebtBalance;
     mapping(address => uint) minterDepositBalance;
-
     uint minCollateralRatio;
 
-    function setMinCollateralRatio(uint collateralRatio) internal returns (bool) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() initializer {}
+
+    function initialize(
+        uint _minCollateralRatio
+    ) initializer public {
+        __AccessControl_init();
+        __UUPSUpgradeable_init();
+
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(MINTER_ROLE, msg.sender);
+        _grantRole(UPGRADER_ROLE, msg.sender);
+
+        setMinCollateralRatio(_minCollateralRatio);
+    }
+
+    function _authorizeUpgrade(address newImplementation)
+    internal
+    onlyRole(UPGRADER_ROLE)
+    override
+    {}
+
+    function setMinCollateralRatio(uint collateralRatio) public onlyRole(DEFAULT_ADMIN_ROLE) {
         minCollateralRatio = collateralRatio;
-        return true;
     }
 
     function getMinCollateralRatio() public view returns (uint) {
@@ -25,32 +54,28 @@ abstract contract Reserve is IReserve {
         return minterDepositBalance[minter].divideDecimal(minterDebtBalance[minter]);
     }
 
-    function addMinterDebt(address minter, uint amount) public returns (bool) {
+    function addMinterDebt(address minter, uint amount) public onlyRole(MINTER_ROLE) {
         minterDebtBalance[minter] += amount;
-        return true;
     }
 
-    function reduceMinterDebt(address minter, uint amount) public returns (bool) {
+    function reduceMinterDebt(address minter, uint amount) public onlyRole(MINTER_ROLE) {
         minterDebtBalance[minter] -= amount;
-        return true;
     }
 
-    function getMinterDebt(address minter) public view returns (uint userDebt) {
-        userDebt = minterDebtBalance[minter];
+    function getMinterDebt(address minter) public view returns (uint) {
+        return minterDebtBalance[minter];
     }
 
-    function addMinterDeposit(address minter, uint amount) public returns (bool) {
+    function addMinterDeposit(address minter, uint amount) public onlyRole(MINTER_ROLE) {
         minterDepositBalance[minter] += amount;
-        return true;
     }
 
-    function reduceMinterDeposit(address minter, uint amount) public returns (bool) {
+    function reduceMinterDeposit(address minter, uint amount) public onlyRole(MINTER_ROLE) {
         minterDepositBalance[minter] -= amount;
-        return true;
     }
 
-    function getMinterDeposit(address minter) public view returns (uint userDeposit) {
-        userDeposit = minterDepositBalance[minter];
+    function getMinterDeposit(address minter) public view returns (uint) {
+        return minterDepositBalance[minter];
     }
 
 }

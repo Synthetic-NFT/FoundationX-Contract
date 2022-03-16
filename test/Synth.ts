@@ -1,12 +1,19 @@
 import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
-import { Liquidation, MockOralce, SafeDecimalMath, Synth } from "../typechain";
+import {
+  Liquidation,
+  MockOralce,
+  Reserve,
+  SafeDecimalMath,
+  Synth,
+} from "../typechain";
 import { beforeEach, describe, it } from "mocha";
 
 import { BigNumber } from "ethers";
 
 describe("Synth", function () {
   let librarySafeDecimalMath: SafeDecimalMath;
+  let reserve: Reserve;
   let liquidation: Liquidation;
   let oracle: MockOralce;
   let synth: Synth;
@@ -22,6 +29,11 @@ describe("Synth", function () {
     liquidationPenalty: BigNumber,
     minCollateralRatio: BigNumber
   ) {
+    const Reserve = await ethers.getContractFactory("Reserve");
+    reserve = (await upgrades.deployProxy(Reserve, [
+      minCollateralRatio,
+    ])) as Reserve;
+
     const Liquidation = await ethers.getContractFactory("Liquidation", {
       libraries: {
         SafeDecimalMath: librarySafeDecimalMath.address,
@@ -29,7 +41,7 @@ describe("Synth", function () {
     });
     liquidation = (await upgrades.deployProxy(
       Liquidation,
-      [liquidationPenalty, minCollateralRatio],
+      [reserve.address, liquidationPenalty],
       { unsafeAllowLinkedLibraries: true }
     )) as Liquidation;
 
@@ -43,9 +55,17 @@ describe("Synth", function () {
     });
     synth = (await upgrades.deployProxy(
       Synth,
-      [liquidation.address, oracle.address, "CryptoPunks", "$PUNK"],
+      [
+        reserve.address,
+        liquidation.address,
+        oracle.address,
+        "CryptoPunks",
+        "$PUNK",
+      ],
       { unsafeAllowLinkedLibraries: true }
     )) as Synth;
+
+    await reserve.grantRole(await reserve.MINTER_ROLE(), synth.address);
   };
 
   it("Mint burn Synth", async function () {
@@ -59,7 +79,7 @@ describe("Synth", function () {
     await synth.mintSynth(signer2.address, BigNumber.from(20).mul(unit));
 
     const assertBalance = async function (address: string, balance: BigNumber) {
-      expect(await synth.getMinterDebt(address)).to.equal(balance);
+      expect(await reserve.getMinterDebt(address)).to.equal(balance);
       expect(await synth.balanceOf(address)).to.equal(balance);
     };
 

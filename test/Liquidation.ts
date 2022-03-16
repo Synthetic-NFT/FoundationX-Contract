@@ -1,12 +1,13 @@
 import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
-import { Liquidation, SafeDecimalMath } from "../typechain";
+import { Liquidation, Reserve, SafeDecimalMath } from "../typechain";
 import { beforeEach, it } from "mocha";
 import { closeBigNumber } from "./shared/math";
 import { BigNumber } from "ethers";
 
 describe("Liquidation", function () {
   let librarySafeDecimalMath: SafeDecimalMath;
+  let reserve: Reserve;
   let liquidation: Liquidation;
   let unit: BigNumber;
 
@@ -20,6 +21,11 @@ describe("Liquidation", function () {
     liquidationPenalty: BigNumber,
     minCollateralRatio: BigNumber
   ) {
+    const Reserve = await ethers.getContractFactory("Reserve");
+    reserve = (await upgrades.deployProxy(Reserve, [
+      minCollateralRatio,
+    ])) as Reserve;
+
     const Liquidation = await ethers.getContractFactory("Liquidation", {
       libraries: {
         SafeDecimalMath: librarySafeDecimalMath.address,
@@ -27,7 +33,7 @@ describe("Liquidation", function () {
     });
     liquidation = (await upgrades.deployProxy(
       Liquidation,
-      [liquidationPenalty, minCollateralRatio],
+      [reserve.address, liquidationPenalty],
       { unsafeAllowLinkedLibraries: true }
     )) as Liquidation;
   };
@@ -71,16 +77,16 @@ describe("Liquidation", function () {
     ) {
       await liquidation.flagAccountForLiquidation(signerAddress);
       await Promise.all([
-        liquidation.addMinterDeposit(signerAddress, deposit),
-        liquidation.addMinterDebt(signerAddress, debt),
+        reserve.addMinterDeposit(signerAddress, deposit),
+        reserve.addMinterDebt(signerAddress, debt),
       ]);
       await liquidation.checkAndRemoveAccountInLiquidation(signerAddress);
-      expect(
-        await liquidation.getMinterCollateralRatio(signerAddress)
-      ).to.equal(collateralRatio);
-      expect(
-        await liquidation.isOpenForLiquidation(signerAddress)
-      ).to.equal(openForLiquidation);
+      expect(await reserve.getMinterCollateralRatio(signerAddress)).to.equal(
+        collateralRatio
+      );
+      expect(await liquidation.isOpenForLiquidation(signerAddress)).to.equal(
+        openForLiquidation
+      );
     };
 
     it("removed", async function () {
