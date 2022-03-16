@@ -88,7 +88,7 @@ contract Factory is IFactory {
 
         uint userCollateralRatio = getMinterCollateralRatio(msg.sender, synth, reserve);
         uint synthPrice = getSynthPriceToEth(synth);
-        uint transferAmount = userCollateralRatio * amount * synthPrice;
+        uint transferAmount = userCollateralRatio.multiplyDecimal(amount).multiplyDecimal(synthPrice);
         payable(msg.sender).transfer(transferAmount);
         reserve.reduceMinterDeposit(msg.sender, transferAmount);
         return true;

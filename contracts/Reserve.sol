@@ -50,8 +50,8 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
         return minCollateralRatio;
     }
 
-    function getMinterCollateralRatio(address minter) public view returns (uint) {
-        return minterDepositBalance[minter].divideDecimal(minterDebtBalance[minter]);
+    function getMinterCollateralRatio(address minter, uint assetPrice) public view returns (uint) {
+        return minterDepositBalance[minter].divideDecimal(minterDebtBalance[minter].multiplyDecimal(assetPrice));
     }
 
     function addMinterDebt(address minter, uint amount) public onlyRole(MINTER_ROLE) {

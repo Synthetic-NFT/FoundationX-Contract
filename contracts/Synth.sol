@@ -12,6 +12,7 @@ import "./interfaces/ISynth.sol";
 import "./Reserve.sol";
 import "./Liquidation.sol";
 import "./interfaces/IOracle.sol";
+import "hardhat/console.sol";
 
 contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable {
     using SafeMath for uint;
@@ -20,6 +21,9 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+
+    string public constant ERR_LIQUIDATE_ABOVE_MIN_COLLATERAL_RATIO = "Account collateral ratio is above min collateral ratio";
+    string public constant ERR_LIQUIDATE_NOT_ENOUGH_SYNTH = "Not enough synthNFTs";
 
     Liquidation liquidation;
     Reserve reserve;
@@ -104,20 +108,21 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
     ) external returns (uint totalRedeemed, uint amountToLiquidate) {
         // Check account is liquidation open
         require(liquidation.isOpenForLiquidation(account), "Account not open for liquidation");
+        uint synthPrice = getSynthPriceToEth();
+        require(reserve.getMinterCollateralRatio(account, synthPrice) <= reserve.getMinCollateralRatio(), ERR_LIQUIDATE_ABOVE_MIN_COLLATERAL_RATIO);
 
         // require liquidator has enough sUSD
-        require(IERC20(address(this)).balanceOf(liquidator) >= synthAmount, "Not enough synthNFTs");
+        require(IERC20(address(this)).balanceOf(liquidator) >= synthAmount, ERR_LIQUIDATE_NOT_ENOUGH_SYNTH);
 
         uint liquidationPenalty = liquidation.getLiquidationPenalty();
 
         // What is their debt in ETH?
-        uint synthPrice = getSynthPriceToEth();
         uint amountSynthDebt = reserve.getMinterDebt(account);
-        uint debtBalance = synthPrice * amountSynthDebt;
-        uint liquidateSynthEthValue = synthPrice * synthAmount;
-
+        uint debtBalance = synthPrice.multiplyDecimal(amountSynthDebt);
+        uint liquidateSynthEthValue = synthPrice.multiplyDecimal(synthAmount);
 
         uint collateralForAccount = reserve.getMinterDeposit(account);
+
         uint amountToFixCollateralRatio = liquidation.calculateAmountToFixCollateral(debtBalance, collateralForAccount);
 
         // Cap amount to liquidate to repair collateral ratio based on issuance ratio
@@ -143,11 +148,9 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
         burnSynth(account, liquidator, synthLiquidated);
         reserve.reduceMinterDeposit(account, totalRedeemed);
         // Remove liquidation flag if amount liquidated fixes ratio
-        if (amountToLiquidate == amountToFixCollateralRatio) {
+        if (amountToLiquidate >= amountToFixCollateralRatio) {
             // Remove liquidation
             liquidation.removeAccountInLiquidation(account);
         }
     }
-
-
 }

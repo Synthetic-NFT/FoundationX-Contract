@@ -5,7 +5,7 @@ import { beforeEach, it } from "mocha";
 import { closeBigNumber } from "./shared/math";
 import { BigNumber } from "ethers";
 
-describe("Liquidation", function () {
+describe("#Liquidation", function () {
   let librarySafeDecimalMath: SafeDecimalMath;
   let reserve: Reserve;
   let liquidation: Liquidation;
@@ -45,6 +45,7 @@ describe("Liquidation", function () {
 
     const [_, signer] = await ethers.getSigners();
     const signerAddress = signer.address;
+    await reserve.addMinterDebt(signerAddress, BigNumber.from(1).mul(unit));
     expect(await liquidation.isOpenForLiquidation(signerAddress)).to.equal(
       false
     );
@@ -72,18 +73,22 @@ describe("Liquidation", function () {
     const body = async function (
       deposit: BigNumber,
       debt: BigNumber,
+      assetPrice: BigNumber,
       collateralRatio: BigNumber,
       openForLiquidation: boolean
     ) {
-      await liquidation.flagAccountForLiquidation(signerAddress);
       await Promise.all([
         reserve.addMinterDeposit(signerAddress, deposit),
         reserve.addMinterDebt(signerAddress, debt),
       ]);
-      await liquidation.checkAndRemoveAccountInLiquidation(signerAddress);
-      expect(await reserve.getMinterCollateralRatio(signerAddress)).to.equal(
-        collateralRatio
+      await liquidation.flagAccountForLiquidation(signerAddress);
+      await liquidation.checkAndRemoveAccountInLiquidation(
+        signerAddress,
+        assetPrice
       );
+      expect(
+        await reserve.getMinterCollateralRatio(signerAddress, assetPrice)
+      ).to.equal(collateralRatio);
       expect(await liquidation.isOpenForLiquidation(signerAddress)).to.equal(
         openForLiquidation
       );
@@ -92,6 +97,7 @@ describe("Liquidation", function () {
     it("removed", async function () {
       await body(
         BigNumber.from(130).mul(unit),
+        BigNumber.from(1).mul(unit),
         BigNumber.from(100).mul(unit),
         BigNumber.from(13).mul(unit).div(10),
         false
@@ -101,6 +107,7 @@ describe("Liquidation", function () {
     it("not removed", async function () {
       await body(
         BigNumber.from(120).mul(unit),
+        BigNumber.from(1).mul(unit),
         BigNumber.from(100).mul(unit),
         BigNumber.from(12).mul(unit).div(10),
         true

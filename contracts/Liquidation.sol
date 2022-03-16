@@ -43,20 +43,23 @@ contract Liquidation is AccessControlUpgradeable, UUPSUpgradeable {
     }
 
     // Mutative Functions
+    // Note that it's caller's responsibility to verify the collateral ratio of account satisfies the liquidaation criteria.
     function flagAccountForLiquidation(address account) external {
+        require(reserve.getMinterDebt(account) > 0, "Invalid account");
         liquidatableUsers[account] = true;
     }
 
     // Restricted: used internally to Synthetix contracts
+    // Note that it's caller's responsibility to verify the collateral ratio of account satisfies the liquidaation criteria.
     function removeAccountInLiquidation(address account) public {
         if (liquidatableUsers[account]) {
             delete liquidatableUsers[account];
         }
     }
 
-    function checkAndRemoveAccountInLiquidation(address account) external {
+    function checkAndRemoveAccountInLiquidation(address account, uint assetPrice) external {
         require(liquidatableUsers[account], "User has not liquidation open");
-        if (reserve.getMinterCollateralRatio(account) > reserve.getMinCollateralRatio()) {
+        if (reserve.getMinterCollateralRatio(account, assetPrice) > reserve.getMinCollateralRatio()) {
             removeAccountInLiquidation(account);
         }
     }
