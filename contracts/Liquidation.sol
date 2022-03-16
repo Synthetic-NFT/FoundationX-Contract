@@ -28,7 +28,7 @@ contract Liquidation is AccessControlUpgradeable, UUPSUpgradeable {
         _grantRole(UPGRADER_ROLE, msg.sender);
 
         reserve = _reserve;
-        require(reserve.getMinCollateralRatio() >= _liquidationPenalty.add(SafeDecimalMath.UNIT), "Invalid liquidation penalty and min collateral ratio");
+        require(reserve.getMinCollateralRatio() >= _liquidationPenalty, "Invalid liquidation penalty and min collateral ratio");
         setLiquidationPenalty(_liquidationPenalty);
     }
 
@@ -69,14 +69,14 @@ contract Liquidation is AccessControlUpgradeable, UUPSUpgradeable {
      * D = debt balance in ETH
      * V = Collateral in ETH
      * P = liquidation penalty, AKA discount ratio
-     * Calculates amount of synths = (D - V * r) / (1 - (1 + P) * r)
+     * Calculates amount of synths = (D - V * r) / (1 - P * r)
      */
     function calculateAmountToFixCollateral(uint debtBalance, uint collateral) public view returns (uint) {
         uint ratio = reserve.getMinCollateralRatio();
         uint unit = SafeDecimalMath.unit();
 
         uint dividend = collateral.multiplyDecimal(ratio).sub(debtBalance);
-        uint divisor = unit.add(getLiquidationPenalty()).multiplyDecimal(ratio).sub(unit);
+        uint divisor = liquidationPenalty.multiplyDecimal(ratio).sub(unit);
 
         return dividend.divideDecimal(divisor);
     }

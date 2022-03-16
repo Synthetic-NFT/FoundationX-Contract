@@ -109,7 +109,8 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
         // Check account is liquidation open
         require(liquidation.isOpenForLiquidation(account), "Account not open for liquidation");
         uint synthPrice = getSynthPriceToEth();
-        require(reserve.getMinterCollateralRatio(account, synthPrice) <= reserve.getMinCollateralRatio(), ERR_LIQUIDATE_ABOVE_MIN_COLLATERAL_RATIO);
+        uint minterCollateralRatio = reserve.getMinterCollateralRatio(account, synthPrice);
+        require(minterCollateralRatio <= reserve.getMinCollateralRatio(), ERR_LIQUIDATE_ABOVE_MIN_COLLATERAL_RATIO);
 
         // require liquidator has enough sUSD
         require(IERC20(address(this)).balanceOf(liquidator) >= synthAmount, ERR_LIQUIDATE_NOT_ENOUGH_SYNTH);
@@ -132,7 +133,8 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
         uint synthLiquidated = amountToLiquidate.divideDecimalRound(synthPrice);
 
         // Add penalty
-        totalRedeemed = synthLiquidated.multiplyDecimal(SafeDecimalMath.unit().add(liquidationPenalty));
+        // Note that if minter's collateral ratio is already below discount ratio, we use the current collateral ratio for discount to prevent the collateral ratio after liquidation from dropping below 1.0.
+        totalRedeemed = amountToLiquidate.multiplyDecimal(minterCollateralRatio < liquidationPenalty ? minterCollateralRatio : liquidationPenalty);
 
         // if total SNX to redeem is greater than account's collateral
         // account is under collateralised, liquidate all collateral and reduce sUSD to burn
@@ -141,7 +143,7 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
             totalRedeemed = collateralForAccount;
 
             // whats the equivalent sUSD to burn for all collateral less penalty
-            synthLiquidated = totalRedeemed.divideDecimal(SafeDecimalMath.unit().add(liquidationPenalty)).divideDecimal(synthPrice);
+            synthLiquidated = totalRedeemed.divideDecimal(liquidationPenalty).divideDecimal(synthPrice);
         }
 
         // burn sUSD from messageSender (liquidator) and reduce account's debt

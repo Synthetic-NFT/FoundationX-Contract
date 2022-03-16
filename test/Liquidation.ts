@@ -39,7 +39,7 @@ describe("#Liquidation", function () {
   };
 
   it("Set and unset liquidation", async function () {
-    const liquidationPenalty = BigNumber.from(25).mul(unit).div(100);
+    const liquidationPenalty = BigNumber.from(125).mul(unit).div(100);
     const minCollateralRatio = BigNumber.from(150).mul(unit).div(100);
     await setUp(liquidationPenalty, minCollateralRatio);
 
@@ -63,7 +63,7 @@ describe("#Liquidation", function () {
     let signerAddress: string;
 
     beforeEach(async function () {
-      const liquidationPenalty = BigNumber.from(10).mul(unit).div(100);
+      const liquidationPenalty = BigNumber.from(110).mul(unit).div(100);
       const minCollateralRatio = BigNumber.from(125).mul(unit).div(100);
       await setUp(liquidationPenalty, minCollateralRatio);
       const [_, signer] = await ethers.getSigners();
@@ -116,7 +116,7 @@ describe("#Liquidation", function () {
   });
 
   it("Calculate amount to fix collateral ratio", async function () {
-    const liquidationPenalty = BigNumber.from(25).mul(unit).div(100);
+    const liquidationPenalty = BigNumber.from(125).mul(unit).div(100);
     const minCollateralRatio = BigNumber.from(150).mul(unit).div(100);
     await setUp(liquidationPenalty, minCollateralRatio);
 

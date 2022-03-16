@@ -50,28 +50,20 @@ describe("#Synth", function () {
       { unsafeAllowLinkedLibraries: true }
     )) as Liquidation;
 
-    const Synth = await ethers.getContractFactory("Synth", {
-      libraries: {
-        SafeDecimalMath: librarySafeDecimalMath.address,
-      },
-    });
-    synth = (await upgrades.deployProxy(
-      Synth,
-      [
-        reserve.address,
-        liquidation.address,
-        oracle.address,
-        tokenName,
-        tokenSymbol,
-      ],
-      { unsafeAllowLinkedLibraries: true }
-    )) as Synth;
+    const Synth = await ethers.getContractFactory("Synth");
+    synth = (await upgrades.deployProxy(Synth, [
+      reserve.address,
+      liquidation.address,
+      oracle.address,
+      tokenName,
+      tokenSymbol,
+    ])) as Synth;
 
     await reserve.grantRole(await reserve.MINTER_ROLE(), synth.address);
   };
 
   it("Mint burn Synth", async function () {
-    const liquidationPenalty = BigNumber.from(25).mul(unit).div(100);
+    const liquidationPenalty = BigNumber.from(125).mul(unit).div(100);
     const minCollateralRatio = BigNumber.from(150).mul(unit).div(100);
     await setUp(liquidationPenalty, minCollateralRatio);
 
@@ -117,7 +109,7 @@ describe("#Synth", function () {
     let liquidatorAddress: string;
 
     beforeEach(async function () {
-      const liquidationPenalty = BigNumber.from(25).mul(unit).div(100);
+      const liquidationPenalty = BigNumber.from(120).mul(unit).div(100);
       const minCollateralRatio = BigNumber.from(150).mul(unit).div(100);
       await setUp(liquidationPenalty, minCollateralRatio);
 
@@ -180,10 +172,29 @@ describe("#Synth", function () {
       await synth
         .connect(liquidatorSigner)
         .approve(ownerAddress, BigNumber.from(5).mul(unit));
+      // Note that callStatic does not change the EVM state. So we need to call this again without callStatic.
+      const [totalRedeemed, amountToLiquidate] =
+        await synth.callStatic.liquidateDelinquentAccount(
+          minterAddress,
+          BigNumber.from(5).mul(unit),
+          liquidatorAddress
+        );
+      expect(totalRedeemed).to.be.equal(BigNumber.from(600).mul(unit));
+      expect(amountToLiquidate).to.be.equal(BigNumber.from(500).mul(unit));
+
       await synth.liquidateDelinquentAccount(
         minterAddress,
         BigNumber.from(5).mul(unit),
         liquidatorAddress
+      );
+      expect(await reserve.getMinterDebt(minterAddress)).to.equal(
+        BigNumber.from(5).mul(unit)
+      );
+      expect(await reserve.getMinterDeposit(minterAddress)).to.equal(
+        BigNumber.from(800).mul(unit)
+      );
+      expect(await synth.balanceOf(liquidatorAddress)).to.equal(
+        BigNumber.from(1).mul(unit)
       );
     });
 
