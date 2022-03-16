@@ -2,8 +2,11 @@
 pragma solidity ^0.8.4;
 
 import "./interfaces/IReserve.sol";
+import "./libraries/SafeDecimalMath.sol";
 
 abstract contract Reserve is IReserve {
+    using SafeDecimalMath for uint;
+
     mapping(address => uint) minterDebtBalance;
     mapping(address => uint) minterDepositBalance;
 
@@ -18,8 +21,8 @@ abstract contract Reserve is IReserve {
         return minCollateralRatio;
     }
 
-    function getMinterCollateralRatio(address minter) public view returns (uint userDebt) {
-        userDebt = minterDebtBalance[minter];
+    function getMinterCollateralRatio(address minter) public view returns (uint) {
+        return minterDepositBalance[minter].divideDecimal(minterDebtBalance[minter]);
     }
 
     function addMinterDebt(address minter, uint amount) public returns (bool) {

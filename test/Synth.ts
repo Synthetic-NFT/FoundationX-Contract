@@ -88,5 +88,11 @@ describe("Synth", function () {
     expect(await synth.totalSupply()).to.equal(BigNumber.from(5).mul(unit));
   });
 
-  it("Liquidate delinquent account", async function () {});
+  it("Liquidate delinquent account", async function () {
+    const liquidationPenalty = BigNumber.from(25).mul(unit).div(100);
+    const minCollateralRatio = BigNumber.from(150).mul(unit).div(100);
+    await setUp(liquidationPenalty, minCollateralRatio);
+
+    const [owner, signer1, signer2] = await ethers.getSigners();
+  });
 });
