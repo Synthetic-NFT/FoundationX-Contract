@@ -32,11 +32,7 @@ contract Liquidation is AccessControlUpgradeable, UUPSUpgradeable {
         setLiquidationPenalty(_liquidationPenalty);
     }
 
-    function _authorizeUpgrade(address newImplementation)
-    internal
-    onlyRole(UPGRADER_ROLE)
-    override
-    {}
+    function _authorizeUpgrade(address newImplementation) internal onlyRole(UPGRADER_ROLE) override {}
 
     function isOpenForLiquidation(address account) public view returns (bool) {
         return liquidatableUsers[account];

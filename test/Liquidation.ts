@@ -73,7 +73,6 @@ describe("#Liquidation", function () {
       deposit: BigNumber,
       debt: BigNumber,
       assetPrice: BigNumber,
-      collateralRatio: BigNumber,
       openForLiquidation: boolean
     ) {
       await Promise.all([
@@ -85,9 +84,6 @@ describe("#Liquidation", function () {
         signerAddress,
         assetPrice
       );
-      expect(
-        await reserve.getMinterCollateralRatio(signerAddress, assetPrice)
-      ).to.equal(collateralRatio);
       expect(await liquidation.isOpenForLiquidation(signerAddress)).to.equal(
         openForLiquidation
       );
@@ -98,7 +94,6 @@ describe("#Liquidation", function () {
         BigNumber.from(130).mul(unit),
         BigNumber.from(1).mul(unit),
         BigNumber.from(100).mul(unit),
-        BigNumber.from(13).mul(unit).div(10),
         false
       );
     });
@@ -108,7 +103,6 @@ describe("#Liquidation", function () {
         BigNumber.from(120).mul(unit),
         BigNumber.from(1).mul(unit),
         BigNumber.from(100).mul(unit),
-        BigNumber.from(12).mul(unit).div(10),
         true
       );
     });

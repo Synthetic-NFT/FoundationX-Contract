@@ -67,21 +67,13 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
         _unpause();
     }
 
-    function _beforeTokenTransfer(address from, address to, uint256 amount)
-    internal
-    whenNotPaused
-    override
-    {
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal whenNotPaused override {
         super._beforeTokenTransfer(from, to, amount);
     }
 
-    function _authorizeUpgrade(address newImplementation)
-    internal
-    onlyRole(UPGRADER_ROLE)
-    override
-    {}
+    function _authorizeUpgrade(address newImplementation) internal onlyRole(UPGRADER_ROLE) override {}
 
-    function getSynthPriceToEth() public returns (uint synthPrice){
+    function getSynthPriceToEth() public view returns (uint synthPrice){
         synthPrice = oracle.getAssetPrice(tokenName);
     }
 

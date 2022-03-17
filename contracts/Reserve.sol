@@ -36,11 +36,7 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
         setMinCollateralRatio(_minCollateralRatio);
     }
 
-    function _authorizeUpgrade(address newImplementation)
-    internal
-    onlyRole(UPGRADER_ROLE)
-    override
-    {}
+    function _authorizeUpgrade(address newImplementation) internal onlyRole(UPGRADER_ROLE) override {}
 
     function setMinCollateralRatio(uint collateralRatio) public onlyRole(DEFAULT_ADMIN_ROLE) {
         minCollateralRatio = collateralRatio;
