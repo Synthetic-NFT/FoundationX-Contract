@@ -2,7 +2,6 @@ import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
 import { Liquidation, Reserve, SafeDecimalMath } from "../typechain";
 import { beforeEach, it } from "mocha";
-import { closeBigNumber } from "./shared/math";
 import { BigNumber } from "ethers";
 
 describe("#Liquidation", function () {
@@ -116,26 +115,14 @@ describe("#Liquidation", function () {
   });
 
   it("Calculate amount to fix collateral ratio", async function () {
-    const liquidationPenalty = BigNumber.from(125).mul(unit).div(100);
-    const minCollateralRatio = BigNumber.from(150).mul(unit).div(100);
+    const liquidationPenalty = BigNumber.from(120).mul(unit).div(100);
+    const minCollateralRatio = BigNumber.from(160).mul(unit).div(100);
     await setUp(liquidationPenalty, minCollateralRatio);
 
     const collateral = BigNumber.from(300).mul(unit);
-    const debtBalance = BigNumber.from(250).mul(unit);
-    const precision = 4;
-    const amountToFix = await liquidation.calculateAmountToFixCollateral(
-      debtBalance,
-      collateral
-    );
-    const expectAmoutToFix = BigNumber.from(2285714)
-      .mul(unit)
-      .div(Math.pow(10, precision));
+    const debtBalance = BigNumber.from(200).mul(unit);
     expect(
-      closeBigNumber(
-        amountToFix,
-        expectAmoutToFix,
-        BigNumber.from(1).mul(unit).div(Math.pow(10, precision))
-      )
-    ).to.equal(true);
+      await liquidation.calculateAmountToFixCollateral(debtBalance, collateral)
+    ).to.equal(BigNumber.from(50).mul(unit));
   });
 });

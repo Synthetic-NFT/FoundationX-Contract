@@ -69,14 +69,14 @@ contract Liquidation is AccessControlUpgradeable, UUPSUpgradeable {
      * D = debt balance in ETH
      * V = Collateral in ETH
      * P = liquidation penalty, AKA discount ratio
-     * Calculates amount of synths = (D - V * r) / (1 - P * r)
+     * Calculates amount of synths = (V * r - D) / (r - P)
      */
     function calculateAmountToFixCollateral(uint debtBalance, uint collateral) public view returns (uint) {
         uint ratio = reserve.getMinCollateralRatio();
         uint unit = SafeDecimalMath.unit();
 
-        uint dividend = collateral.multiplyDecimal(ratio).sub(debtBalance);
-        uint divisor = liquidationPenalty.multiplyDecimal(ratio).sub(unit);
+        uint dividend = debtBalance.multiplyDecimal(ratio).sub(collateral);
+        uint divisor = ratio.sub(liquidationPenalty);
 
         return dividend.divideDecimal(divisor);
     }

@@ -109,6 +109,7 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
         // Check account is liquidation open
         require(liquidation.isOpenForLiquidation(account), "Account not open for liquidation");
         uint synthPrice = getSynthPriceToEth();
+        uint minterDebt = reserve.getMinterDebt(account);
         uint minterCollateralRatio = reserve.getMinterCollateralRatio(account, synthPrice);
         require(minterCollateralRatio <= reserve.getMinCollateralRatio(), ERR_LIQUIDATE_ABOVE_MIN_COLLATERAL_RATIO);
 
@@ -118,9 +119,8 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
         uint liquidationPenalty = liquidation.getLiquidationPenalty();
 
         // What is their debt in ETH?
-        uint amountSynthDebt = reserve.getMinterDebt(account);
-        uint debtBalance = synthPrice.multiplyDecimal(amountSynthDebt);
-        uint liquidateSynthEthValue = synthPrice.multiplyDecimal(synthAmount);
+        uint debtBalance = synthPrice.multiplyDecimal(minterDebt);
+        uint liquidateSynthEthValue = synthPrice.multiplyDecimal(synthAmount > minterDebt ? minterDebt : synthAmount);
 
         uint collateralForAccount = reserve.getMinterDeposit(account);
 
@@ -150,7 +150,7 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
         burnSynth(account, liquidator, synthLiquidated);
         reserve.reduceMinterDeposit(account, totalRedeemed);
         // Remove liquidation flag if amount liquidated fixes ratio
-        if (amountToLiquidate >= amountToFixCollateralRatio) {
+        if (amountToLiquidate >= amountToFixCollateralRatio || synthLiquidated >= minterDebt) {
             // Remove liquidation
             liquidation.removeAccountInLiquidation(account);
         }
