@@ -11,8 +11,10 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "./interfaces/ISynth.sol";
 import "./Reserve.sol";
 import "./Liquidation.sol";
+import "./interfaces/IOracle.sol";
+import "hardhat/console.sol";
 
-contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable {
+contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable {
     using SafeMath for uint;
     using SafeDecimalMath for uint;
 
@@ -20,16 +22,22 @@ contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20Burnabl
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
+    string public constant ERR_LIQUIDATE_ABOVE_MIN_COLLATERAL_RATIO = "Account collateral ratio is above min collateral ratio";
+    string public constant ERR_LIQUIDATE_NOT_ENOUGH_SYNTH = "Not enough synthNFTs";
+
     Liquidation liquidation;
-    uint256 totalDebtIssued;
-    //    Reserve tokenReserve;
-    //    Liquidation liquidation;
+    Reserve reserve;
+    IOracle oracle;
+    string tokenName;
+    string tokenSymbol;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
     function initialize(
-    //        Reserve _tokenReserve,
+        Reserve _reserve,
         Liquidation _liquidation,
+        IOracle _oracle,
         string memory _tokenName,
         string memory _tokenSymbol
     ) initializer public {
@@ -44,8 +52,11 @@ contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20Burnabl
         _grantRole(MINTER_ROLE, msg.sender);
         _grantRole(UPGRADER_ROLE, msg.sender);
 
-        //        tokenReserve = _tokenReserve;
+        reserve = _reserve;
         liquidation = _liquidation;
+        oracle = _oracle;
+        tokenName = _tokenName;
+        tokenSymbol = _tokenSymbol;
     }
 
     function pause() public onlyRole(PAUSER_ROLE) {
@@ -56,61 +67,30 @@ contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20Burnabl
         _unpause();
     }
 
-    function mint(address to, uint256 amount) public override onlyRole(MINTER_ROLE) {
-        _mint(to, amount);
-    }
-
-    function _beforeTokenTransfer(address from, address to, uint256 amount)
-    internal
-    whenNotPaused
-    override
-    {
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal whenNotPaused override {
         super._beforeTokenTransfer(from, to, amount);
     }
 
-    function _authorizeUpgrade(address newImplementation)
-    internal
-    onlyRole(UPGRADER_ROLE)
-    override
-    {}
+    function _authorizeUpgrade(address newImplementation) internal onlyRole(UPGRADER_ROLE) override {}
 
-
-    //    function getSynthPriceToEth() public returns (uint synthPrice){
-    //        uint synthPrice = 100;
-    //    }
-    //
-    //    function getMinterCollateralRatio(address minter) public returns (uint collateralRatio) {
-    //        uint synthPrice = getSynthPriceToEth();
-    //        uint userDebtOfSynth = getMinterDebt(minter);
-    //
-    //        if (userDebtOfSynth == 0) {
-    //            uint collateralRatio = 0;
-    //        }
-    //        else {
-    //            uint userEthDeposited = this.getMinterDeposit(minter);
-    //            uint collateralRatio =  userEthDeposited.divideDecimalRound(synthPrice.multiplyDecimalRound(userDebtOfSynth));
-    //        }
-    //    }
-
-    // TODO: replace this with Oracle
-    function getSynthPriceToEth() public returns (uint synthPrice){
-        synthPrice = 100;
+    function getSynthPriceToEth() public view returns (uint synthPrice){
+        synthPrice = oracle.getAssetPrice(tokenName);
     }
 
     function mintSynth(address minter, uint amount) public onlyRole(MINTER_ROLE) {
-        mint(minter, amount);
-        addMinterDebt(minter, amount);
+        _mint(minter, amount);
+        reserve.addMinterDebt(minter, amount);
     }
 
     function burnSynth(address debtAccount, address burnAccount, uint amount) public onlyRole(MINTER_ROLE) {
-        uint existingDebt = getMinterDebt(debtAccount);
+        uint existingDebt = reserve.getMinterDebt(debtAccount);
         uint amountBurnt = existingDebt < amount ? existingDebt : amount;
 
         // synth.burn does a safe subtraction on balance (so it will revert if there are not enough synths).
         burnFrom(burnAccount, amountBurnt);
 
         // Account for the burnt debt in the cache.
-        reduceMinterDebt(debtAccount, amount);
+        reserve.reduceMinterDebt(debtAccount, amountBurnt);
     }
 
     function liquidateDelinquentAccount(
@@ -120,20 +100,22 @@ contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20Burnabl
     ) external returns (uint totalRedeemed, uint amountToLiquidate) {
         // Check account is liquidation open
         require(liquidation.isOpenForLiquidation(account), "Account not open for liquidation");
+        uint synthPrice = getSynthPriceToEth();
+        uint minterDebt = reserve.getMinterDebt(account);
+        uint minterCollateralRatio = reserve.getMinterCollateralRatio(account, synthPrice);
+        require(minterCollateralRatio <= reserve.getMinCollateralRatio(), ERR_LIQUIDATE_ABOVE_MIN_COLLATERAL_RATIO);
 
         // require liquidator has enough sUSD
-        require(IERC20(address(this)).balanceOf(liquidator) >= synthAmount, "Not enough synthNFTs");
+        require(IERC20(address(this)).balanceOf(liquidator) >= synthAmount, ERR_LIQUIDATE_NOT_ENOUGH_SYNTH);
 
         uint liquidationPenalty = liquidation.getLiquidationPenalty();
 
         // What is their debt in ETH?
-        uint synthPrice = getSynthPriceToEth();
-        uint amountSynthDebt = getMinterDebt(account);
-        uint debtBalance = synthPrice * amountSynthDebt;
-        uint liquidateSynthEthValue = synthPrice * synthAmount;
+        uint debtBalance = synthPrice.multiplyDecimal(minterDebt);
+        uint liquidateSynthEthValue = synthPrice.multiplyDecimal(synthAmount > minterDebt ? minterDebt : synthAmount);
 
+        uint collateralForAccount = reserve.getMinterDeposit(account);
 
-        uint collateralForAccount = getMinterDeposit(account);
         uint amountToFixCollateralRatio = liquidation.calculateAmountToFixCollateral(debtBalance, collateralForAccount);
 
         // Cap amount to liquidate to repair collateral ratio based on issuance ratio
@@ -143,7 +125,8 @@ contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20Burnabl
         uint synthLiquidated = amountToLiquidate.divideDecimalRound(synthPrice);
 
         // Add penalty
-        totalRedeemed = synthLiquidated.multiplyDecimal(SafeDecimalMath.unit().add(liquidationPenalty));
+        // Note that if minter's collateral ratio is already below discount ratio, we use the current collateral ratio for discount to prevent the collateral ratio after liquidation from dropping below 1.0.
+        totalRedeemed = amountToLiquidate.multiplyDecimal(minterCollateralRatio < liquidationPenalty ? minterCollateralRatio : liquidationPenalty);
 
         // if total SNX to redeem is greater than account's collateral
         // account is under collateralised, liquidate all collateral and reduce sUSD to burn
@@ -152,18 +135,16 @@ contract Synth is ISynth, Reserve, Initializable, ERC20Upgradeable, ERC20Burnabl
             totalRedeemed = collateralForAccount;
 
             // whats the equivalent sUSD to burn for all collateral less penalty
-            synthLiquidated = totalRedeemed.divideDecimal(SafeDecimalMath.unit().add(liquidationPenalty)).divideDecimal(synthPrice);
+            synthLiquidated = totalRedeemed.divideDecimal(liquidationPenalty).divideDecimal(synthPrice);
         }
 
         // burn sUSD from messageSender (liquidator) and reduce account's debt
         burnSynth(account, liquidator, synthLiquidated);
-        reduceMinterDeposit(account, totalRedeemed);
+        reserve.reduceMinterDeposit(account, totalRedeemed);
         // Remove liquidation flag if amount liquidated fixes ratio
-        if (amountToLiquidate == amountToFixCollateralRatio) {
+        if (amountToLiquidate >= amountToFixCollateralRatio || synthLiquidated >= minterDebt) {
             // Remove liquidation
             liquidation.removeAccountInLiquidation(account);
         }
     }
-
-
 }
