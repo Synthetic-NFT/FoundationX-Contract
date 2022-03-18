@@ -24,6 +24,8 @@ contract Factory is IFactory, AccessControlUpgradeable, UUPSUpgradeable {
     mapping(string => SynthReserve) availableSynthReserveByName;
 
     string public constant ERR_USER_UNDER_COLLATERALIZED = "User under collateralized";
+    string public constant ERR_NOT_ENOUGH_SYNTH_TO_MINT = "Not enough mintable synth";
+    string public constant ERR_BURNING_EXCEED_DEBT = "Burning amount exceeds user debt";
 
     event Received(address, uint);
 
@@ -55,7 +57,8 @@ contract Factory is IFactory, AccessControlUpgradeable, UUPSUpgradeable {
     function userDepositEther(string memory synthName) public payable returns (bool) {
         Reserve reserve = availableSynthReserveByName[synthName].reserve;
         require(address(reserve) != address(0), "Synth not available");
-        require(msg.sender.balance >= msg.value, "User does not have enough ETH");
+        // TODO: figure out why ETH transfer is invoked ahead the assertion
+        //        require(msg.sender.balance >= msg.value, "User does not have enough ETH");
         payable(this).transfer(msg.value);
         reserve.addMinterDeposit(msg.sender, msg.value);
         return true;
@@ -92,7 +95,7 @@ contract Factory is IFactory, AccessControlUpgradeable, UUPSUpgradeable {
         Reserve reserve = synthReserve.reserve;
         require(address(synth) != address(0), "Synth not available");
         uint remainingMintableAmount = remainingMintableSynth(msg.sender, synth, reserve);
-        require(remainingMintableAmount > amount, "Not enough mintable synth remained");
+        require(remainingMintableAmount > amount, ERR_NOT_ENOUGH_SYNTH_TO_MINT);
         synth.mintSynth(msg.sender, amount);
         return true;
     }
@@ -102,18 +105,17 @@ contract Factory is IFactory, AccessControlUpgradeable, UUPSUpgradeable {
         Synth synth = synthReserve.synth;
         Reserve reserve = synthReserve.reserve;
         require(address(synth) != address(0), "Synth not available");
-        require(reserve.getMinterDebt(msg.sender) > amount, "Expected burning amount exceeds user debt");
+        uint minterDebt = reserve.getMinterDebt(msg.sender);
+        require(minterDebt > amount, ERR_BURNING_EXCEED_DEBT);
         synth.burnSynth(msg.sender, msg.sender, amount);
-
-        uint synthPrice = getSynthPriceToEth(synth);
-        uint userCollateralRatio = reserve.getMinterCollateralRatio(msg.sender, synthPrice);
-        uint transferAmount = userCollateralRatio.multiplyDecimal(amount).multiplyDecimal(synthPrice);
-        payable(msg.sender).transfer(transferAmount);
+        uint transferAmount = amount.divideDecimal(minterDebt).multiplyDecimal(reserve.getMinterDeposit(msg.sender));
         reserve.reduceMinterDeposit(msg.sender, transferAmount);
+        payable(msg.sender).transfer(transferAmount);
         return true;
     }
 
-    function userLiquidate(Synth synth, address account, uint synthAmount) public payable returns (bool) {
+    function userLiquidate(string memory synthName, address account, uint synthAmount) public payable returns (bool) {
+        Synth synth = availableSynthReserveByName[synthName].synth;
         (uint totalRedeemed, uint amountToLiquidate) = synth.liquidateDelinquentAccount(account, synthAmount, msg.sender);
         payable(msg.sender).transfer(totalRedeemed);
         return true;
