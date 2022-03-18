@@ -67,9 +67,6 @@ contract Factory is IFactory, AccessControlUpgradeable, UUPSUpgradeable {
     function userDepositEther(string memory synthName) public payable lock returns (bool) {
         Reserve reserve = availableSynthReserveByName[synthName].reserve;
         require(address(reserve) != address(0), "Synth not available");
-        // TODO: figure out why ETH transfer is invoked ahead the assertion
-        //        require(msg.sender.balance >= msg.value, "User does not have enough ETH");
-        payable(this).transfer(msg.value);
         reserve.addMinterDeposit(msg.sender, msg.value);
         return true;
     }
