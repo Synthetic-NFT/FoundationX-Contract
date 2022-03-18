@@ -27,6 +27,8 @@ contract Factory is IFactory, AccessControlUpgradeable, UUPSUpgradeable {
     string public constant ERR_NOT_ENOUGH_SYNTH_TO_MINT = "Not enough mintable synth";
     string public constant ERR_BURNING_EXCEED_DEBT = "Burning amount exceeds user debt";
 
+    bool locked;
+
     event Received(address, uint);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -37,10 +39,18 @@ contract Factory is IFactory, AccessControlUpgradeable, UUPSUpgradeable {
         __UUPSUpgradeable_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        locked = false;
     }
 
     receive() external payable {
         emit Received(msg.sender, msg.value);
+    }
+
+    modifier lock() {
+        require(!locked, 'LOK');
+        locked = true;
+        _;
+        locked = false;
     }
 
     function _authorizeUpgrade(address newImplementation) internal onlyRole(DEFAULT_ADMIN_ROLE) override {}
@@ -54,7 +64,7 @@ contract Factory is IFactory, AccessControlUpgradeable, UUPSUpgradeable {
         delete availableSynthReserveByName[synthName];
     }
 
-    function userDepositEther(string memory synthName) public payable returns (bool) {
+    function userDepositEther(string memory synthName) public payable lock returns (bool) {
         Reserve reserve = availableSynthReserveByName[synthName].reserve;
         require(address(reserve) != address(0), "Synth not available");
         // TODO: figure out why ETH transfer is invoked ahead the assertion
@@ -89,7 +99,7 @@ contract Factory is IFactory, AccessControlUpgradeable, UUPSUpgradeable {
         return userDepositAmount.multiplyDecimal(invMinCollateralRatio.sub(userInvCollateralRatio)).divideDecimal(synthToEthPrice);
     }
 
-    function userMintSynth(string memory synthName, uint amount) public payable returns (bool) {
+    function userMintSynth(string memory synthName, uint amount) public payable lock returns (bool) {
         SynthReserve storage synthReserve = availableSynthReserveByName[synthName];
         Synth synth = synthReserve.synth;
         Reserve reserve = synthReserve.reserve;
@@ -100,7 +110,7 @@ contract Factory is IFactory, AccessControlUpgradeable, UUPSUpgradeable {
         return true;
     }
 
-    function userBurnSynth(string memory synthName, uint amount) public payable returns (bool) {
+    function userBurnSynth(string memory synthName, uint amount) public payable lock returns (bool) {
         SynthReserve storage synthReserve = availableSynthReserveByName[synthName];
         Synth synth = synthReserve.synth;
         Reserve reserve = synthReserve.reserve;
@@ -114,7 +124,7 @@ contract Factory is IFactory, AccessControlUpgradeable, UUPSUpgradeable {
         return true;
     }
 
-    function userLiquidate(string memory synthName, address account, uint synthAmount) public payable returns (bool) {
+    function userLiquidate(string memory synthName, address account, uint synthAmount) public payable lock returns (bool) {
         Synth synth = availableSynthReserveByName[synthName].synth;
         (uint totalRedeemed, uint amountToLiquidate) = synth.liquidateDelinquentAccount(account, synthAmount, msg.sender);
         payable(msg.sender).transfer(totalRedeemed);
