@@ -13,6 +13,7 @@ import "./Reserve.sol";
 import "./Liquidation.sol";
 import "./interfaces/IOracle.sol";
 import "hardhat/console.sol";
+import "./libraries/SafeDecimalMath.sol";
 
 contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable {
     using SafeMath for uint;

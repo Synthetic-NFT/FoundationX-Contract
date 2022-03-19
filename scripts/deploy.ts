@@ -3,7 +3,10 @@
 //
 // When running the script with `npx hardhat run <script>` you'll find the Hardhat
 // Runtime Environment's members available in the global scope.
-import { ethers } from "hardhat";
+const { ethers, upgrades } = require("hardhat");
+// eslint-disable-next-line node/no-extraneous-require
+const { getImplementationAddress } = require("@openzeppelin/upgrades-core");
+const hre = require("hardhat");
 
 async function main() {
   // Hardhat always runs the compile task when running scripts with its command
@@ -14,13 +17,79 @@ async function main() {
   // await hre.run('compile');
 
   // We get the contract to deploy
-  const Greeter = await ethers.getContractFactory("Greeter");
-  const greeter = await Greeter.deploy("Hello, Hardhat!");
 
-  await greeter.deployed();
+  const SafeDecimalMath = await ethers.getContractFactory("SafeDecimalMath");
+  const safeDecimalMath = await SafeDecimalMath.deploy();
+  await safeDecimalMath.deployed();
+  console.log("SafeDecimalMath deployed to:", safeDecimalMath.address);
 
-  console.log("Greeter deployed to:", greeter.address);
+  const Reserve = await ethers.getContractFactory("Reserve");
+  const reserve = await upgrades.deployProxy(Reserve, [2]);
+  await reserve.deployed();
+  console.log("Reserve deployed to:", reserve.address);
+  // const currentImplAddress = await getImplementationAddress(provider, reserve.address);
+  // console.log(await hre.upgrades.erc1967.getImplementationAddress(reserve.address));
+  // const implHex = await ethers.provider.getStorageAt(
+  //     reserve.address,
+  //     "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc"
+  // );
+  // const implAddress = ethers.utils.hexStripZeros(implHex);
+  // console.log(implAddress);
+  // console.log(await reserve.getMinCollateralRatio());
+  const Liquidation = await ethers.getContractFactory("Liquidation", {
+    libraries: {
+      SafeDecimalMath: safeDecimalMath.address,
+    },
+  });
+  const liquidation = await upgrades.deployProxy(
+    Liquidation,
+    [reserve.address, 0],
+    {
+      unsafeAllow: ["external-library-linking"],
+    }
+  );
+  await liquidation.deployed();
+  console.log("Liquidation deployed to:", liquidation.address);
+
+  const MockOracle = await ethers.getContractFactory("MockOralce");
+  const oracle = await MockOracle.deploy();
+  console.log("Oracle deployed to:", oracle.address);
+
+  const Synth = await ethers.getContractFactory("Synth");
+  const synth = await upgrades.deployProxy(Synth, [
+    reserve.address,
+    liquidation.address,
+    oracle.address,
+    "SynthTest1",
+    "ST1",
+  ], {
+    unsafeAllow: ["external-library-linking"],
+  });
+  await synth.deployed();
+  console.log("Synth deployed to:", synth.address);
+
+  const Factory = await ethers.getContractFactory("Factory", {
+    libraries: {
+      SafeDecimalMath: safeDecimalMath.address,
+    },
+  });
+  const factory = await upgrades.deployProxy(Factory, [], {
+    unsafeAllow: ["external-library-linking"],
+  });
+  await factory.deployed();
+  console.log("Factory deployed to:", factory.address);
+
+
+  await factory.listSynth("SynthTest1", synth.address, reserve.address);
+  await reserve.grantRole(await reserve.MINTER_ROLE(), factory.address);
+  await reserve.grantRole(await reserve.MINTER_ROLE(), synth.address);
+  await synth.grantRole(await synth.MINTER_ROLE(), factory.address);
+  await liquidation.grantRole(
+      await liquidation.DEFAULT_ADMIN_ROLE(),
+      synth.address
+  );
 }
+
 
 // We recommend this pattern to be able to use async/await everywhere
 // and properly handle errors.

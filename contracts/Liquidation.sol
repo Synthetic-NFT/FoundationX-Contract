@@ -4,8 +4,8 @@ pragma solidity ^0.8.4;
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./libraries/SafeDecimalMath.sol";
 import "./Reserve.sol";
+import "./libraries/SafeDecimalMath.sol";
 
 
 contract Liquidation is AccessControlUpgradeable, UUPSUpgradeable {

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import "./interfaces/IReserve.sol";
-import "./libraries/SafeDecimalMath.sol";
+
 
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-
+import "./interfaces/IReserve.sol";
+import "./libraries/SafeDecimalMath.sol";
 
 contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
 
@@ -74,4 +74,8 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
         return minterDepositBalance[minter];
     }
 
+//    modifier onlyFactory() {
+//        require(msg.sender == address(issuer()), "Liquidations: Only the Issuer contract can perform this action");
+//        _;
+//    }
 }

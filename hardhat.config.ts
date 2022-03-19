@@ -1,15 +1,17 @@
-require('@openzeppelin/hardhat-upgrades');
-
-import '@openzeppelin/hardhat-upgrades';
+import "@openzeppelin/hardhat-upgrades";
 
 import * as dotenv from "dotenv";
 
-import {HardhatUserConfig, task} from "hardhat/config";
+import { HardhatUserConfig, task } from "hardhat/config";
 import "@nomiclabs/hardhat-etherscan";
 import "@nomiclabs/hardhat-waffle";
 import "@typechain/hardhat";
 import "hardhat-gas-reporter";
 import "solidity-coverage";
+
+require("@openzeppelin/hardhat-upgrades");
+
+require("hardhat-abi-exporter");
 
 dotenv.config();
 
