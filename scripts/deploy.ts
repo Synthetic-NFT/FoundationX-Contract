@@ -7,6 +7,7 @@ const { ethers, upgrades } = require("hardhat");
 // eslint-disable-next-line node/no-extraneous-require
 const { getImplementationAddress } = require("@openzeppelin/upgrades-core");
 const hre = require("hardhat");
+import {BigNumber} from "ethers";
 
 async function main() {
   // Hardhat always runs the compile task when running scripts with its command
@@ -24,7 +25,9 @@ async function main() {
   console.log("SafeDecimalMath deployed to:", safeDecimalMath.address);
 
   const Reserve = await ethers.getContractFactory("Reserve");
-  const reserve = await upgrades.deployProxy(Reserve, [2]);
+  const unit = await safeDecimalMath.unit();
+  const minCollateralRatio = BigNumber.from(150).mul(unit).div(100);
+  const reserve = await upgrades.deployProxy(Reserve, [minCollateralRatio]);
   await reserve.deployed();
   console.log("Reserve deployed to:", reserve.address);
   // const currentImplAddress = await getImplementationAddress(provider, reserve.address);
@@ -41,9 +44,11 @@ async function main() {
       SafeDecimalMath: safeDecimalMath.address,
     },
   });
+
+  const liquidationPenalty = BigNumber.from(120).mul(unit).div(100);
   const liquidation = await upgrades.deployProxy(
     Liquidation,
-    [reserve.address, 0],
+    [reserve.address, liquidationPenalty],
     {
       unsafeAllow: ["external-library-linking"],
     }
