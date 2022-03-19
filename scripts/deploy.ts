@@ -61,15 +61,13 @@ async function main() {
   console.log("Oracle deployed to:", oracle.address);
 
   const Synth = await ethers.getContractFactory("Synth");
-  const synth = await upgrades.deployProxy(Synth, [
-    reserve.address,
-    liquidation.address,
-    oracle.address,
-    "SynthTest1",
-    "ST1",
-  ], {
-    unsafeAllow: ["external-library-linking"],
-  });
+  const synth = await upgrades.deployProxy(
+    Synth,
+    [reserve.address, liquidation.address, oracle.address, "SynthTest1", "ST1"],
+    {
+      unsafeAllow: ["external-library-linking"],
+    }
+  );
   await synth.deployed();
   console.log("Synth deployed to:", synth.address);
 
@@ -84,17 +82,15 @@ async function main() {
   await factory.deployed();
   console.log("Factory deployed to:", factory.address);
 
-
   await factory.listSynth("SynthTest1", synth.address, reserve.address);
   await reserve.grantRole(await reserve.MINTER_ROLE(), factory.address);
   await reserve.grantRole(await reserve.MINTER_ROLE(), synth.address);
   await synth.grantRole(await synth.MINTER_ROLE(), factory.address);
   await liquidation.grantRole(
-      await liquidation.DEFAULT_ADMIN_ROLE(),
-      synth.address
+    await liquidation.DEFAULT_ADMIN_ROLE(),
+    synth.address
   );
 }
-
 
 // We recommend this pattern to be able to use async/await everywhere
 // and properly handle errors.
