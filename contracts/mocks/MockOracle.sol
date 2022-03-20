@@ -11,12 +11,12 @@ contract MockOralce is IOracle {
     mapping(string => uint) assetPrices;
     mapping(string => bool) assetSupported;
 
-    function getAssetPrice(string memory asset) external override view returns (uint) {
+    function getAssetPrice(string calldata asset) external override view returns (uint) {
         require(assetSupported[asset], "Asset is not supported.");
         return assetPrices[asset];
     }
 
-    function setAssetPrice(string memory asset, uint price) external {
+    function setAssetPrice(string calldata asset, uint price) external {
         assetSupported[asset] = true;
         assetPrices[asset] = price;
     }
