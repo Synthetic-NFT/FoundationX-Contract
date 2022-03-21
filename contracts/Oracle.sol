@@ -4,6 +4,7 @@ import "./interfaces/IOracle.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "./libraries/SafeDecimalMath.sol";
+import "hardhat/console.sol";
 
 
 contract Oracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
@@ -25,9 +26,10 @@ contract Oracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     uint constant ORACLE_FUTURE_LIMIT = 10 minutes;
 
     // How long will the contract assume the rate of any asset is correct
-    uint public priceStalePeriod = 1 hours;
+    uint public priceStalePeriod;
 
     string public constant ERR_PRICE_STALE = "Price stales";
+    string public constant ERR_TOO_FAR_INTO_FUTURE = "Time is too far into the future";
 
     event OracleUpdated(address newOracle);
     event PriceStalePeriodUpdated(uint rateStalePeriod);
@@ -37,7 +39,8 @@ contract Oracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
     constructor() initializer {}
 
     function initialize(
-        address _oracle
+        address _oracle,
+        uint _priceStalePeriod
     ) initializer public {
         __AccessControl_init();
         __UUPSUpgradeable_init();
@@ -46,6 +49,7 @@ contract Oracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
         _grantRole(UPGRADER_ROLE, msg.sender);
 
         oracle = _oracle;
+        priceStalePeriod = _priceStalePeriod;
     }
 
     function _authorizeUpgrade(address newImplementation) internal onlyRole(UPGRADER_ROLE) override {}
@@ -56,13 +60,12 @@ contract Oracle is IOracle, AccessControlUpgradeable, UUPSUpgradeable {
 
     function internalUpdatePrices(string[] calldata assets, uint[] calldata prices, uint timeSent) internal {
         require(assets.length == prices.length, "Currency key array length must match rates array length.");
-        require(timeSent < (block.timestamp.add(ORACLE_FUTURE_LIMIT)), "Time is too far into the future");
+        require(timeSent < (block.timestamp.add(ORACLE_FUTURE_LIMIT)), ERR_TOO_FAR_INTO_FUTURE);
 
         for (uint i = 0; i < assets.length; i++) {
             require(prices[i] != 0, "Zero is not a valid rate, please call deleteRate instead.");
 
             if (timeSent >= lastPriceUpdateTimes[assets[i]]) {
-                // Ok, go ahead with the update.
                 assetPrices[assets[i]] = prices[i];
                 lastPriceUpdateTimes[assets[i]] = timeSent;
             }
