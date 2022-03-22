@@ -3,7 +3,9 @@
 //
 // When running the script with `npx hardhat run <script>` you'll find the Hardhat
 // Runtime Environment's members available in the global scope.
-import { ethers } from "hardhat";
+import { ethers, upgrades } from "hardhat";
+import { BigNumber } from "ethers";
+import { Oracle } from "../typechain";
 
 async function main() {
   // Hardhat always runs the compile task when running scripts with its command
@@ -14,12 +16,20 @@ async function main() {
   // await hre.run('compile');
 
   // We get the contract to deploy
-  const Greeter = await ethers.getContractFactory("Greeter");
-  const greeter = await Greeter.deploy("Hello, Hardhat!");
+  const priceStalePeriod: BigNumber = BigNumber.from(10).mul(60);
+  const [owner] = await ethers.getSigners();
+  console.log("Owner address:", owner.address);
 
-  await greeter.deployed();
+  const Library = await ethers.getContractFactory("SafeDecimalMath");
+  const library = await Library.deploy();
+  console.log("Library deployed to:", library.address);
 
-  console.log("Greeter deployed to:", greeter.address);
+  const Oracle = await ethers.getContractFactory("Oracle");
+  const oracle = (await upgrades.deployProxy(Oracle, [
+    owner.address,
+    priceStalePeriod,
+  ])) as Oracle;
+  console.log("Oracle deployed to:", oracle.address);
 }
 
 // We recommend this pattern to be able to use async/await everywhere
