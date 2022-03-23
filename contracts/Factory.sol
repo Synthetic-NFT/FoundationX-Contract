@@ -26,6 +26,9 @@ contract Factory is IFactory, AccessControlUpgradeable, UUPSUpgradeable {
     string public constant ERR_USER_UNDER_COLLATERALIZED = "User under collateralized";
     string public constant ERR_NOT_ENOUGH_SYNTH_TO_MINT = "Not enough mintable synth";
     string public constant ERR_BURNING_EXCEED_DEBT = "Burning amount exceeds user debt";
+    string public constant ERR_SYNTH_NOT_AVAILABLE = "Synth not available";
+    string public constant ERR_INVALID_TARGET_DEPOSIT = "Invalid target deposit";
+    string public constant ERR_INVALID_TARGET_COLLATERAL_RATIO = "Invalid target collateral ratio";
 
     bool locked;
 
@@ -64,64 +67,54 @@ contract Factory is IFactory, AccessControlUpgradeable, UUPSUpgradeable {
         delete availableSynthReserveByName[synthName];
     }
 
-    function userDepositEther(string memory synthName) public payable lock returns (bool) {
-        Reserve reserve = availableSynthReserveByName[synthName].reserve;
-        require(address(reserve) != address(0), "Synth not available");
-        reserve.addMinterDeposit(msg.sender, msg.value);
-        return true;
-    }
-
-    function getSynthPriceToEth(Synth synth) public view returns (uint synthPrice){
-        synthPrice = synth.getSynthPriceToEth();
-    }
-
-    function getMinterInvCollateralRatio(address minter, Synth synth, Reserve reserve) public view returns (uint invCollateralRatio) {
-        uint userDebtOfSynth = reserve.getMinterDebt(minter);
-
-        if (userDebtOfSynth == 0) {
-            invCollateralRatio = 0;
-        }
-        else {
-            uint synthPrice = getSynthPriceToEth(synth);
-            invCollateralRatio = SafeDecimalMath.unit().divideDecimal(reserve.getMinterCollateralRatio(minter, synthPrice));
-        }
-    }
-
-    function remainingMintableSynth(address minter, Synth synth, Reserve reserve) public view returns (uint){
-        uint synthToEthPrice = getSynthPriceToEth(synth);
-        uint userInvCollateralRatio = getMinterInvCollateralRatio(minter, synth, reserve);
-        uint invMinCollateralRatio = SafeDecimalMath.unit().divideDecimal(reserve.getMinCollateralRatio());
-        require(invMinCollateralRatio > userInvCollateralRatio, ERR_USER_UNDER_COLLATERALIZED);
-        uint userDepositAmount = reserve.getMinterDeposit(minter);
-        return userDepositAmount.multiplyDecimal(invMinCollateralRatio.sub(userInvCollateralRatio)).divideDecimal(synthToEthPrice);
-    }
-
-    function userMintSynth(string memory synthName, uint amount) public payable lock returns (bool) {
+    function userMintSynth(string memory synthName, uint targetCollateralRatio) external payable lock {
         SynthReserve storage synthReserve = availableSynthReserveByName[synthName];
         Synth synth = synthReserve.synth;
         Reserve reserve = synthReserve.reserve;
-        require(address(synth) != address(0), "Synth not available");
-        uint remainingMintableAmount = remainingMintableSynth(msg.sender, synth, reserve);
-        require(remainingMintableAmount > amount, ERR_NOT_ENOUGH_SYNTH_TO_MINT);
-        synth.mintSynth(msg.sender, amount);
-        return true;
+        require(address(synth) != address(0), ERR_SYNTH_NOT_AVAILABLE);
+        internalUserManageSynth(synth, reserve, targetCollateralRatio, msg.value);
     }
 
-    function userBurnSynth(string memory synthName, uint amount) public payable lock returns (bool) {
+    function userBurnSynth(string memory synthName) external payable lock {
         SynthReserve storage synthReserve = availableSynthReserveByName[synthName];
         Synth synth = synthReserve.synth;
         Reserve reserve = synthReserve.reserve;
-        require(address(synth) != address(0), "Synth not available");
-        uint minterDebt = reserve.getMinterDebt(msg.sender);
-        require(minterDebt > amount, ERR_BURNING_EXCEED_DEBT);
-        synth.burnSynth(msg.sender, msg.sender, amount);
-        uint transferAmount = amount.divideDecimal(minterDebt).multiplyDecimal(reserve.getMinterDeposit(msg.sender));
-        reserve.reduceMinterDeposit(msg.sender, transferAmount);
-        payable(msg.sender).transfer(transferAmount);
-        return true;
+        require(address(synth) != address(0), ERR_SYNTH_NOT_AVAILABLE);
+        internalUserManageSynth(synth, reserve, reserve.getMinCollateralRatio(), 0);
     }
 
-    function userLiquidate(string memory synthName, address account, uint synthAmount) public payable lock returns (bool) {
+    function userManageSynth(string memory synthName, uint targetCollateralRatio, uint targetDeposit) external payable lock {
+        SynthReserve storage synthReserve = availableSynthReserveByName[synthName];
+        Synth synth = synthReserve.synth;
+        Reserve reserve = synthReserve.reserve;
+        require(address(synth) != address(0), ERR_SYNTH_NOT_AVAILABLE);
+        internalUserManageSynth(synth, reserve, targetCollateralRatio, targetDeposit);
+    }
+
+    function internalUserManageSynth(Synth synth, Reserve reserve, uint targetCollateralRatio, uint targetDeposit) private {
+        require(targetCollateralRatio >= reserve.getMinCollateralRatio(), ERR_INVALID_TARGET_COLLATERAL_RATIO);
+
+        if (msg.value > 0) {
+            reserve.addMinterDeposit(msg.sender, msg.value);
+            require(reserve.getMinterDeposit(msg.sender) == targetDeposit, ERR_INVALID_TARGET_DEPOSIT);
+        }
+
+        uint originalDebt = reserve.getMinterDebt(msg.sender);
+        uint targetDebt = targetDeposit.divideDecimal(targetCollateralRatio).divideDecimal(synth.getSynthPriceToEth());
+        if (originalDebt > targetDebt) {
+            synth.burnSynth(msg.sender, msg.sender, originalDebt.sub(targetDebt));
+        } else if (originalDebt < targetDebt) {
+            synth.mintSynth(msg.sender, targetDebt - originalDebt);
+        }
+
+        uint originalDeposit = reserve.getMinterDeposit(msg.sender);
+        if (originalDeposit > targetDeposit) {
+            reserve.reduceMinterDeposit(msg.sender, originalDeposit - targetDeposit);
+            payable(msg.sender).transfer(originalDeposit - targetDeposit);
+        }
+    }
+
+    function userLiquidate(string memory synthName, address account, uint synthAmount) external payable lock returns (bool) {
         Synth synth = availableSynthReserveByName[synthName].synth;
         (uint totalRedeemed, uint amountToLiquidate) = synth.liquidateDelinquentAccount(account, synthAmount, msg.sender);
         payable(msg.sender).transfer(totalRedeemed);
