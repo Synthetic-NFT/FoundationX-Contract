@@ -21,6 +21,7 @@ describe("#Factory", function () {
   let oracle: MockOralce;
   let synth: Synth;
   let factory: Factory;
+  let decimal: number;
   let unit: BigNumber;
   const tokenName = "CryptoPunks";
   const tokenSymbol = "$PUNK";
@@ -28,6 +29,7 @@ describe("#Factory", function () {
   beforeEach(async function () {
     const Library = await ethers.getContractFactory("SafeDecimalMath");
     librarySafeDecimalMath = await Library.deploy();
+    decimal = await librarySafeDecimalMath.decimals();
     unit = await librarySafeDecimalMath.UNIT();
     const MockOracle = await ethers.getContractFactory("MockOralce");
     oracle = await MockOracle.deploy();
@@ -90,8 +92,8 @@ describe("#Factory", function () {
     let minterAddress: string;
 
     beforeEach(async function () {
-      const liquidationPenalty = BigNumber.from(120).mul(unit).div(100);
-      const minCollateralRatio = BigNumber.from(150).mul(unit).div(100);
+      const liquidationPenalty = ethers.utils.parseUnits("1.2", decimal);
+      const minCollateralRatio = ethers.utils.parseUnits("1.5", decimal);
       await setUp(liquidationPenalty, minCollateralRatio);
       const [_, minterSigner] = await ethers.getSigners();
       minter = minterSigner;
@@ -106,7 +108,7 @@ describe("#Factory", function () {
       await expect(
         factory
           .connect(minter)
-          .userMintSynth(tokenName, BigNumber.from(140).mul(unit).div(100), {
+          .userMintSynth(tokenName, ethers.utils.parseUnits("1.4", decimal), {
             value: BigNumber.from(200).mul(unit),
           })
       ).to.be.revertedWith(await factory.ERR_INVALID_TARGET_COLLATERAL_RATIO());
@@ -115,7 +117,7 @@ describe("#Factory", function () {
     it("Valid", async function () {
       await factory
         .connect(minter)
-        .userMintSynth(tokenName, BigNumber.from(160).mul(unit).div(100), {
+        .userMintSynth(tokenName, ethers.utils.parseUnits("1.6", decimal), {
           value: BigNumber.from(320).mul(unit),
         });
       const minterDebt = BigNumber.from(20).mul(unit);
@@ -130,8 +132,8 @@ describe("#Factory", function () {
   });
 
   it("User burn synth", async function () {
-    const liquidationPenalty = BigNumber.from(120).mul(unit).div(100);
-    const minCollateralRatio = BigNumber.from(150).mul(unit).div(100);
+    const liquidationPenalty = ethers.utils.parseUnits("1.2", decimal);
+    const minCollateralRatio = ethers.utils.parseUnits("1.5", decimal);
     await setUp(liquidationPenalty, minCollateralRatio);
     const [_, minter] = await ethers.getSigners();
     const minterAddress = minter.address;
@@ -142,7 +144,7 @@ describe("#Factory", function () {
     ]);
     await factory
       .connect(minter)
-      .userMintSynth(tokenName, BigNumber.from(160).mul(unit).div(100), {
+      .userMintSynth(tokenName, ethers.utils.parseUnits("1.6", decimal), {
         value: BigNumber.from(320).mul(unit),
       });
     await synth
@@ -177,8 +179,8 @@ describe("#Factory", function () {
     let minterAddress: string;
 
     beforeEach(async function () {
-      const liquidationPenalty = BigNumber.from(120).mul(unit).div(100);
-      const minCollateralRatio = BigNumber.from(150).mul(unit).div(100);
+      const liquidationPenalty = ethers.utils.parseUnits("1.2", decimal);
+      const minCollateralRatio = ethers.utils.parseUnits("1.5", decimal);
       await setUp(liquidationPenalty, minCollateralRatio);
       const [_, minterSigner] = await ethers.getSigners();
       minter = minterSigner;
@@ -189,40 +191,135 @@ describe("#Factory", function () {
       ]);
     });
 
+    const assertFactoryState = async function (
+      minterBalance: BigNumber,
+      factoryBalance: BigNumber,
+      minterDeposit: BigNumber,
+      minterDebt: BigNumber
+    ) {
+      expect(await getEthBalance(factory.address)).to.equal(factoryBalance);
+      expect(await synth.balanceOf(minterAddress)).to.equal(minterDebt);
+      expect(await reserve.getMinterDebt(minterAddress)).to.equal(minterDebt);
+      expect(await reserve.getMinterDeposit(minterAddress)).to.equal(
+        minterDeposit
+      );
+      expect(
+        closeBigNumber(
+          minterDeposit,
+          await getEthBalance(minterAddress),
+          BigNumber.from(1).mul(unit.sub(4))
+        )
+      );
+    };
+
     it("Add deposit add debt", async function () {
       await factory
         .connect(minter)
-        .userMintSynth(tokenName, BigNumber.from(160).mul(unit), {
+        .userMintSynth(tokenName, ethers.utils.parseUnits("1.6", decimal), {
           value: BigNumber.from(160).mul(unit),
         });
       await factory
         .connect(minter)
         .userManageSynth(
           tokenName,
-          BigNumber.from(170).mul(unit),
+          ethers.utils.parseUnits("1.7", decimal),
           BigNumber.from(340).mul(unit),
           { value: BigNumber.from(180).mul(unit) }
         );
+      const minterBalance = BigNumber.from(60).mul(unit);
       const minterDebt = BigNumber.from(20).mul(unit);
       const minterDeposit = BigNumber.from(340).mul(unit);
-      expect(await getEthBalance(factory.address)).to.equal(minterDebt);
-      expect(await synth.balanceOf(minterAddress)).to.equal(minterDebt);
-      expect(await reserve.getMinterDebt(minterAddress)).to.equal(minterDebt);
-      expect(await reserve.getMinterDeposit(minterAddress)).to.equal(
-        minterDeposit
+      await assertFactoryState(
+        minterBalance,
+        minterDeposit,
+        minterDeposit,
+        minterDebt
       );
     });
 
-    it("Add deposit reduce debt", async function () {});
+    it("Add deposit reduce debt", async function () {
+      await factory
+        .connect(minter)
+        .userMintSynth(tokenName, ethers.utils.parseUnits("1.6", decimal), {
+          value: BigNumber.from(160).mul(unit),
+        });
+      await synth
+        .connect(minter)
+        .approve(factory.address, BigNumber.from(1).mul(unit));
+      await factory
+        .connect(minter)
+        .userManageSynth(
+          tokenName,
+          ethers.utils.parseUnits("2.0", decimal),
+          BigNumber.from(180).mul(unit),
+          { value: BigNumber.from(20).mul(unit) }
+        );
+      const minterBalance = BigNumber.from(220).mul(unit);
+      const minterDebt = BigNumber.from(9).mul(unit);
+      const minterDeposit = BigNumber.from(180).mul(unit);
+      await assertFactoryState(
+        minterBalance,
+        minterDeposit,
+        minterDeposit,
+        minterDebt
+      );
+    });
 
-    it("Reduce deposit add debt", async function () {});
+    it("Reduce deposit add debt", async function () {
+      await factory
+        .connect(minter)
+        .userMintSynth(tokenName, ethers.utils.parseUnits("2.0", decimal), {
+          value: BigNumber.from(180).mul(unit),
+        });
+      await factory
+        .connect(minter)
+        .userManageSynth(
+          tokenName,
+          ethers.utils.parseUnits("1.6", decimal),
+          BigNumber.from(160).mul(unit)
+        );
+      const minterBalance = BigNumber.from(240).mul(unit);
+      const minterDebt = BigNumber.from(10).mul(unit);
+      const minterDeposit = BigNumber.from(160).mul(unit);
+      await assertFactoryState(
+        minterBalance,
+        minterDeposit,
+        minterDeposit,
+        minterDebt
+      );
+    });
 
-    it("Reduce deposit reduce debt", async function () {});
+    it("Reduce deposit reduce debt", async function () {
+      await factory
+        .connect(minter)
+        .userMintSynth(tokenName, ethers.utils.parseUnits("2.0", decimal), {
+          value: BigNumber.from(240).mul(unit),
+        });
+      await synth
+        .connect(minter)
+        .approve(factory.address, BigNumber.from(2).mul(unit));
+      await factory
+        .connect(minter)
+        .userManageSynth(
+          tokenName,
+          ethers.utils.parseUnits("1.6", decimal),
+          BigNumber.from(160).mul(unit)
+        );
+      const minterBalance = BigNumber.from(240).mul(unit);
+      const minterDebt = BigNumber.from(10).mul(unit);
+      const minterDeposit = BigNumber.from(160).mul(unit);
+      await assertFactoryState(
+        minterBalance,
+        minterDeposit,
+        minterDeposit,
+        minterDebt
+      );
+    });
   });
 
   it("User liquidate", async function () {
-    const liquidationPenalty = BigNumber.from(120).mul(unit).div(100);
-    const minCollateralRatio = BigNumber.from(150).mul(unit).div(100);
+    const liquidationPenalty = ethers.utils.parseUnits("1.2", decimal);
+    const minCollateralRatio = ethers.utils.parseUnits("1.5", decimal);
     await setUp(liquidationPenalty, minCollateralRatio);
     const [_, minter, liquidator] = await ethers.getSigners();
     const minterAddress = minter.address;
@@ -239,7 +336,7 @@ describe("#Factory", function () {
 
     await factory
       .connect(minter)
-      .userMintSynth(tokenName, BigNumber.from(225).mul(unit).div(100), {
+      .userMintSynth(tokenName, ethers.utils.parseUnits("2.25", decimal), {
         value: BigNumber.from(2700).mul(unit),
       });
     await Promise.all([
