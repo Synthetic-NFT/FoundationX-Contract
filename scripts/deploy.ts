@@ -3,11 +3,11 @@
 //
 // When running the script with `npx hardhat run <script>` you'll find the Hardhat
 // Runtime Environment's members available in the global scope.
+import { BigNumber } from "ethers";
 const { ethers, upgrades } = require("hardhat");
 // eslint-disable-next-line node/no-extraneous-require
 const { getImplementationAddress } = require("@openzeppelin/upgrades-core");
 const hre = require("hardhat");
-import {BigNumber} from "ethers";
 
 async function main() {
   // Hardhat always runs the compile task when running scripts with its command
@@ -71,14 +71,8 @@ async function main() {
   await synth.deployed();
   console.log("Synth deployed to:", synth.address);
 
-  const Factory = await ethers.getContractFactory("Factory", {
-    libraries: {
-      SafeDecimalMath: safeDecimalMath.address,
-    },
-  });
-  const factory = await upgrades.deployProxy(Factory, [], {
-    unsafeAllow: ["external-library-linking"],
-  });
+  const Factory = await ethers.getContractFactory("Factory");
+  const factory = await upgrades.deployProxy(Factory, []);
   await factory.deployed();
   console.log("Factory deployed to:", factory.address);
 
