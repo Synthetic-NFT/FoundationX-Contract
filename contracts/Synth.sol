@@ -100,11 +100,12 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
         address liquidator
     ) external returns (uint totalRedeemed, uint amountToLiquidate) {
         // Check account is liquidation open
-        require(liquidation.isOpenForLiquidation(account), "Account not open for liquidation");
         uint synthPrice = getSynthPriceToEth();
         uint minterDebt = reserve.getMinterDebt(account);
         uint minterCollateralRatio = reserve.getMinterCollateralRatio(account, synthPrice);
         require(minterCollateralRatio <= reserve.getMinCollateralRatio(), ERR_LIQUIDATE_ABOVE_MIN_COLLATERAL_RATIO);
+
+        liquidation.flagAccountForLiquidation(account);
 
         // require liquidator has enough sUSD
         require(IERC20(address(this)).balanceOf(liquidator) >= synthAmount, ERR_LIQUIDATE_NOT_ENOUGH_SYNTH);

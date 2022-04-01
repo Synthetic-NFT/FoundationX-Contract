@@ -59,6 +59,10 @@ describe("#Synth", function () {
       tokenSymbol,
     ])) as Synth;
 
+    await liquidation.grantRole(
+      await liquidation.DEFAULT_ADMIN_ROLE(),
+      synth.address
+    );
     await reserve.grantRole(await reserve.MINTER_ROLE(), synth.address);
   };
 
@@ -130,7 +134,6 @@ describe("#Synth", function () {
         reserve.addMinterDeposit(minterAddress, deposit),
         oracle.setAssetPrice(tokenName, assetPrice),
       ]);
-      await liquidation.flagAccountForLiquidation(minterAddress);
     };
 
     it("Not liquidable", async function () {
@@ -193,7 +196,9 @@ describe("#Synth", function () {
       expect(await reserve.getMinterDeposit(minterAddress)).to.equal(
         BigNumber.from(1040).mul(unit)
       );
-      expect(await liquidation.isOpenForLiquidation(minterAddress)).to.equal(true);
+      expect(await liquidation.isOpenForLiquidation(minterAddress)).to.equal(
+        true
+      );
       expect(await synth.balanceOf(liquidatorAddress)).to.equal(
         BigNumber.from(0).mul(unit)
       );
@@ -230,7 +235,9 @@ describe("#Synth", function () {
       expect(await reserve.getMinterDeposit(minterAddress)).to.equal(
         BigNumber.from(1500).mul(unit)
       );
-      expect(await liquidation.isOpenForLiquidation(minterAddress)).to.equal(false);
+      expect(await liquidation.isOpenForLiquidation(minterAddress)).to.equal(
+        false
+      );
       expect(await synth.balanceOf(liquidatorAddress)).to.equal(
         BigNumber.from(2).mul(unit)
       );
