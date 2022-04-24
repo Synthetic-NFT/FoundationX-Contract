@@ -72,7 +72,9 @@ contract Factory is IFactory, AccessControlUpgradeable, UUPSUpgradeable {
         Synth synth = synthReserve.synth;
         Reserve reserve = synthReserve.reserve;
         require(address(synth) != address(0), ERR_SYNTH_NOT_AVAILABLE);
-        internalUserManageSynth(synth, reserve, targetCollateralRatio, msg.value);
+        uint originalDebt = reserve.getMinterDebt(msg.sender);
+        uint targetDebt = msg.value.divideDecimal(targetCollateralRatio).divideDecimal(synth.getSynthPriceToEth()) + originalDebt;
+        internalUserManageSynth(synth, reserve, targetCollateralRatio, targetDebt);
     }
 
     function userBurnSynth(string memory synthName) external payable lock {
@@ -83,24 +85,25 @@ contract Factory is IFactory, AccessControlUpgradeable, UUPSUpgradeable {
         internalUserManageSynth(synth, reserve, reserve.getMinCollateralRatio(), 0);
     }
 
-    function userManageSynth(string memory synthName, uint targetCollateralRatio, uint targetDeposit) external payable lock {
+    function userManageSynth(string memory synthName, uint targetCollateralRatio, uint targetDebt) external payable lock {
         SynthReserve storage synthReserve = availableSynthReserveByName[synthName];
         Synth synth = synthReserve.synth;
         Reserve reserve = synthReserve.reserve;
         require(address(synth) != address(0), ERR_SYNTH_NOT_AVAILABLE);
-        internalUserManageSynth(synth, reserve, targetCollateralRatio, targetDeposit);
+        internalUserManageSynth(synth, reserve, targetCollateralRatio, targetDebt);
     }
 
-    function internalUserManageSynth(Synth synth, Reserve reserve, uint targetCollateralRatio, uint targetDeposit) private {
+    function internalUserManageSynth(Synth synth, Reserve reserve, uint targetCollateralRatio, uint targetDebt) private {
         require(targetCollateralRatio >= reserve.getMinCollateralRatio(), ERR_INVALID_TARGET_COLLATERAL_RATIO);
 
         if (msg.value > 0) {
             reserve.addMinterDeposit(msg.sender, msg.value);
-            require(reserve.getMinterDeposit(msg.sender) == targetDeposit, ERR_INVALID_TARGET_DEPOSIT);
+            //TODO: check if this is needed
+            //            require(reserve.getMinterDeposit(msg.sender) == targetDeposit, ERR_INVALID_TARGET_DEPOSIT);
         }
 
         uint originalDebt = reserve.getMinterDebt(msg.sender);
-        uint targetDebt = targetDeposit.divideDecimal(targetCollateralRatio).divideDecimal(synth.getSynthPriceToEth());
+        uint targetDeposit = targetDebt.multiplyDecimal(synth.getSynthPriceToEth()).multiplyDecimal(targetCollateralRatio);
         if (originalDebt > targetDebt) {
             synth.burnSynth(msg.sender, msg.sender, originalDebt.sub(targetDebt));
         } else if (originalDebt < targetDebt) {
@@ -113,6 +116,30 @@ contract Factory is IFactory, AccessControlUpgradeable, UUPSUpgradeable {
             payable(msg.sender).transfer(originalDeposit - targetDeposit);
         }
     }
+
+//    function internalUserManageSynth(Synth synth, Reserve reserve, uint targetCollateralRatio, uint targetDeposit) private {
+//        require(targetCollateralRatio >= reserve.getMinCollateralRatio(), ERR_INVALID_TARGET_COLLATERAL_RATIO);
+//
+//        if (msg.value > 0) {
+//            reserve.addMinterDeposit(msg.sender, msg.value);
+//            //TODO: check if this is needed
+////            require(reserve.getMinterDeposit(msg.sender) == targetDeposit, ERR_INVALID_TARGET_DEPOSIT);
+//        }
+//
+//        uint originalDebt = reserve.getMinterDebt(msg.sender);
+//        uint targetDebt = targetDeposit.divideDecimal(targetCollateralRatio).divideDecimal(synth.getSynthPriceToEth());
+//        if (originalDebt > targetDebt) {
+//            synth.burnSynth(msg.sender, msg.sender, originalDebt.sub(targetDebt));
+//        } else if (originalDebt < targetDebt) {
+//            synth.mintSynth(msg.sender, targetDebt - originalDebt);
+//        }
+//
+//        uint originalDeposit = reserve.getMinterDeposit(msg.sender);
+//        if (originalDeposit > targetDeposit) {
+//            reserve.reduceMinterDeposit(msg.sender, originalDeposit - targetDeposit);
+//            payable(msg.sender).transfer(originalDeposit - targetDeposit);
+//        }
+//    }
 
     function userLiquidate(string memory synthName, address account, uint synthAmount) external payable lock returns (bool) {
         Synth synth = availableSynthReserveByName[synthName].synth;

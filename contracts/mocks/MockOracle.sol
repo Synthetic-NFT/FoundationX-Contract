@@ -16,6 +16,11 @@ contract MockOralce is IOracle {
         return assetPrices[asset];
     }
 
+//    function getAssetPrice(string calldata asset) external override view returns (uint) {
+//        require(assetSupported[asset], "Asset is not supported.");
+//        return 2000000000000000000;
+//    }
+
     function setAssetPrice(string calldata asset, uint price) external {
         assetSupported[asset] = true;
         assetPrices[asset] = price;

@@ -84,6 +84,8 @@ async function main() {
     await liquidation.DEFAULT_ADMIN_ROLE(),
     synth.address
   );
+  await oracle.setAssetPrice("SynthTest1", "2000000000000000000");
+  console.log(await synth.getSynthPriceToEth());
 }
 
 // We recommend this pattern to be able to use async/await everywhere
