@@ -115,18 +115,34 @@ describe("#Factory", function () {
     });
 
     it("Valid", async function () {
-      await factory
-        .connect(minter)
-        .userMintSynth(tokenName, ethers.utils.parseUnits("1.6", decimal), {
-          value: BigNumber.from(320).mul(unit),
-        });
-      const minterDebt = BigNumber.from(20).mul(unit);
-      const minterDeposit = BigNumber.from(320).mul(unit);
-      expect(await getEthBalance(factory.address)).to.equal(minterDeposit);
-      expect(await synth.balanceOf(minterAddress)).to.equal(minterDebt);
-      expect(await reserve.getMinterDebt(minterAddress)).to.equal(minterDebt);
-      expect(await reserve.getMinterDeposit(minterAddress)).to.equal(
-        minterDeposit
+      const mintAndAssert = async function (
+        collateralRatio: BigNumber,
+        mintDeposit: BigNumber,
+        postDebt: BigNumber,
+        postDeposit: BigNumber
+      ) {
+        await factory
+          .connect(minter)
+          .userMintSynth(tokenName, collateralRatio, { value: mintDeposit });
+        expect(await getEthBalance(factory.address)).to.equal(postDeposit);
+        expect(await synth.balanceOf(minterAddress)).to.equal(postDebt);
+        expect(await reserve.getMinterDebt(minterAddress)).to.equal(postDebt);
+        expect(await reserve.getMinterDeposit(minterAddress)).to.equal(
+          postDeposit
+        );
+      };
+
+      await mintAndAssert(
+        ethers.utils.parseUnits("1.6", decimal),
+        BigNumber.from(160).mul(unit),
+        BigNumber.from(10).mul(unit),
+        BigNumber.from(160).mul(unit)
+      );
+      await mintAndAssert(
+        ethers.utils.parseUnits("1.5", decimal),
+        BigNumber.from(150).mul(unit),
+        BigNumber.from(20).mul(unit),
+        BigNumber.from(310).mul(unit)
       );
     });
   });

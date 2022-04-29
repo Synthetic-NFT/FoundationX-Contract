@@ -50,7 +50,7 @@ contract Factory is IFactory, AccessControlUpgradeable, UUPSUpgradeable {
     }
 
     modifier lock() {
-        require(!locked, 'LOK');
+        require(!locked, "LOK");
         locked = true;
         _;
         locked = false;
@@ -67,12 +67,18 @@ contract Factory is IFactory, AccessControlUpgradeable, UUPSUpgradeable {
         delete availableSynthReserveByName[synthName];
     }
 
+    function checkTargetCollateralRatio(Reserve reserve, uint targetCollateralRatio) private {
+        require(targetCollateralRatio >= reserve.getMinCollateralRatio(), ERR_INVALID_TARGET_COLLATERAL_RATIO);
+    }
+
     function userMintSynth(string memory synthName, uint targetCollateralRatio) external payable lock {
         SynthReserve storage synthReserve = availableSynthReserveByName[synthName];
         Synth synth = synthReserve.synth;
         Reserve reserve = synthReserve.reserve;
         require(address(synth) != address(0), ERR_SYNTH_NOT_AVAILABLE);
-        internalUserManageSynth(synth, reserve, targetCollateralRatio, msg.value);
+        checkTargetCollateralRatio(reserve, targetCollateralRatio);
+        reserve.addMinterDeposit(msg.sender, msg.value);
+        synth.mintSynth(msg.sender, msg.value.divideDecimal(targetCollateralRatio.multiplyDecimal(synth.getSynthPriceToEth())));
     }
 
     function userBurnSynth(string memory synthName) external payable lock {
@@ -92,7 +98,7 @@ contract Factory is IFactory, AccessControlUpgradeable, UUPSUpgradeable {
     }
 
     function internalUserManageSynth(Synth synth, Reserve reserve, uint targetCollateralRatio, uint targetDeposit) private {
-        require(targetCollateralRatio >= reserve.getMinCollateralRatio(), ERR_INVALID_TARGET_COLLATERAL_RATIO);
+        checkTargetCollateralRatio(reserve, targetCollateralRatio);
 
         if (msg.value > 0) {
             reserve.addMinterDeposit(msg.sender, msg.value);
