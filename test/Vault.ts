@@ -1,12 +1,12 @@
 import { expect } from "chai";
 import { ethers, network, upgrades } from "hardhat";
 import {
-  Factory,
   Liquidation,
   MockOralce,
   Reserve,
   SafeDecimalMath,
   Synth,
+  Vault,
 } from "../typechain";
 import { beforeEach, describe, it } from "mocha";
 import { BigNumber } from "ethers";
@@ -14,13 +14,13 @@ import { getEthBalance } from "./shared/address";
 import { closeBigNumber } from "./shared/math";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
-describe("#Factory", function () {
+describe("#Vault", function () {
   let librarySafeDecimalMath: SafeDecimalMath;
   let reserve: Reserve;
   let liquidation: Liquidation;
   let oracle: MockOralce;
   let synth: Synth;
-  let factory: Factory;
+  let vault: Vault;
   let decimal: number;
   let unit: BigNumber;
   const tokenName = "CryptoPunks";
@@ -64,13 +64,15 @@ describe("#Factory", function () {
       tokenSymbol,
     ])) as Synth;
 
-    const Factory = await ethers.getContractFactory("Factory");
-    factory = (await upgrades.deployProxy(Factory, [])) as Factory;
-    await factory.listSynth(tokenName, synth.address, reserve.address);
+    const Vault = await ethers.getContractFactory("Vault");
+    vault = (await upgrades.deployProxy(Vault, [
+      synth.address,
+      reserve.address,
+    ])) as Vault;
 
-    await reserve.grantRole(await reserve.MINTER_ROLE(), factory.address);
+    await reserve.grantRole(await reserve.MINTER_ROLE(), vault.address);
     await reserve.grantRole(await reserve.MINTER_ROLE(), synth.address);
-    await synth.grantRole(await synth.MINTER_ROLE(), factory.address);
+    await synth.grantRole(await synth.MINTER_ROLE(), vault.address);
     await liquidation.grantRole(
       await liquidation.DEFAULT_ADMIN_ROLE(),
       synth.address
@@ -106,12 +108,12 @@ describe("#Factory", function () {
 
     it("Invalid", async function () {
       await expect(
-        factory
+        vault
           .connect(minter)
-          .userMintSynth(tokenName, ethers.utils.parseUnits("1.4", decimal), {
+          .userMintSynth(ethers.utils.parseUnits("1.4", decimal), {
             value: BigNumber.from(200).mul(unit),
           })
-      ).to.be.revertedWith(await factory.ERR_INVALID_TARGET_COLLATERAL_RATIO());
+      ).to.be.revertedWith(await vault.ERR_INVALID_TARGET_COLLATERAL_RATIO());
     });
 
     it("Valid", async function () {
@@ -121,10 +123,10 @@ describe("#Factory", function () {
         postDebt: BigNumber,
         postDeposit: BigNumber
       ) {
-        await factory
+        await vault
           .connect(minter)
-          .userMintSynth(tokenName, collateralRatio, { value: mintDeposit });
-        expect(await getEthBalance(factory.address)).to.equal(postDeposit);
+          .userMintSynth(collateralRatio, { value: mintDeposit });
+        expect(await getEthBalance(vault.address)).to.equal(postDeposit);
         expect(await synth.balanceOf(minterAddress)).to.equal(postDebt);
         expect(await reserve.getMinterDebt(minterAddress)).to.equal(postDebt);
         expect(await reserve.getMinterDeposit(minterAddress)).to.equal(
@@ -158,17 +160,17 @@ describe("#Factory", function () {
       setUpUserAccount(minter, BigNumber.from(400).mul(unit)),
       oracle.setAssetPrice(tokenName, BigNumber.from(10).mul(unit)),
     ]);
-    await factory
+    await vault
       .connect(minter)
-      .userMintSynth(tokenName, ethers.utils.parseUnits("1.6", decimal), {
+      .userMintSynth(ethers.utils.parseUnits("1.6", decimal), {
         value: BigNumber.from(320).mul(unit),
       });
     await synth
       .connect(minter)
-      .approve(factory.address, BigNumber.from(20).mul(unit));
-    await factory.connect(minter).userBurnSynth(tokenName);
+      .approve(vault.address, BigNumber.from(20).mul(unit));
+    await vault.connect(minter).userBurnSynth();
 
-    expect(await getEthBalance(factory.address)).to.equal(
+    expect(await getEthBalance(vault.address)).to.equal(
       BigNumber.from(0).mul(unit)
     );
     expect(await synth.balanceOf(minterAddress)).to.equal(
@@ -207,13 +209,13 @@ describe("#Factory", function () {
       ]);
     });
 
-    const assertFactoryState = async function (
+    const assertVaultState = async function (
       minterBalance: BigNumber,
-      factoryBalance: BigNumber,
+      vaultBalance: BigNumber,
       minterDeposit: BigNumber,
       minterDebt: BigNumber
     ) {
-      expect(await getEthBalance(factory.address)).to.equal(factoryBalance);
+      expect(await getEthBalance(vault.address)).to.equal(vaultBalance);
       expect(await synth.balanceOf(minterAddress)).to.equal(minterDebt);
       expect(await reserve.getMinterDebt(minterAddress)).to.equal(minterDebt);
       expect(await reserve.getMinterDeposit(minterAddress)).to.equal(
@@ -229,15 +231,14 @@ describe("#Factory", function () {
     };
 
     it("Add deposit add debt", async function () {
-      await factory
+      await vault
         .connect(minter)
-        .userMintSynth(tokenName, ethers.utils.parseUnits("1.6", decimal), {
+        .userMintSynth(ethers.utils.parseUnits("1.6", decimal), {
           value: BigNumber.from(160).mul(unit),
         });
-      await factory
+      await vault
         .connect(minter)
         .userManageSynth(
-          tokenName,
           ethers.utils.parseUnits("1.7", decimal),
           BigNumber.from(340).mul(unit),
           { value: BigNumber.from(180).mul(unit) }
@@ -245,7 +246,7 @@ describe("#Factory", function () {
       const minterBalance = BigNumber.from(60).mul(unit);
       const minterDebt = BigNumber.from(20).mul(unit);
       const minterDeposit = BigNumber.from(340).mul(unit);
-      await assertFactoryState(
+      await assertVaultState(
         minterBalance,
         minterDeposit,
         minterDeposit,
@@ -254,18 +255,17 @@ describe("#Factory", function () {
     });
 
     it("Add deposit reduce debt", async function () {
-      await factory
+      await vault
         .connect(minter)
-        .userMintSynth(tokenName, ethers.utils.parseUnits("1.6", decimal), {
+        .userMintSynth(ethers.utils.parseUnits("1.6", decimal), {
           value: BigNumber.from(160).mul(unit),
         });
       await synth
         .connect(minter)
-        .approve(factory.address, BigNumber.from(1).mul(unit));
-      await factory
+        .approve(vault.address, BigNumber.from(1).mul(unit));
+      await vault
         .connect(minter)
         .userManageSynth(
-          tokenName,
           ethers.utils.parseUnits("2.0", decimal),
           BigNumber.from(180).mul(unit),
           { value: BigNumber.from(20).mul(unit) }
@@ -273,7 +273,7 @@ describe("#Factory", function () {
       const minterBalance = BigNumber.from(220).mul(unit);
       const minterDebt = BigNumber.from(9).mul(unit);
       const minterDeposit = BigNumber.from(180).mul(unit);
-      await assertFactoryState(
+      await assertVaultState(
         minterBalance,
         minterDeposit,
         minterDeposit,
@@ -282,22 +282,21 @@ describe("#Factory", function () {
     });
 
     it("Reduce deposit add debt", async function () {
-      await factory
+      await vault
         .connect(minter)
-        .userMintSynth(tokenName, ethers.utils.parseUnits("2.0", decimal), {
+        .userMintSynth(ethers.utils.parseUnits("2.0", decimal), {
           value: BigNumber.from(180).mul(unit),
         });
-      await factory
+      await vault
         .connect(minter)
         .userManageSynth(
-          tokenName,
           ethers.utils.parseUnits("1.6", decimal),
           BigNumber.from(160).mul(unit)
         );
       const minterBalance = BigNumber.from(240).mul(unit);
       const minterDebt = BigNumber.from(10).mul(unit);
       const minterDeposit = BigNumber.from(160).mul(unit);
-      await assertFactoryState(
+      await assertVaultState(
         minterBalance,
         minterDeposit,
         minterDeposit,
@@ -306,25 +305,24 @@ describe("#Factory", function () {
     });
 
     it("Reduce deposit reduce debt", async function () {
-      await factory
+      await vault
         .connect(minter)
-        .userMintSynth(tokenName, ethers.utils.parseUnits("2.0", decimal), {
+        .userMintSynth(ethers.utils.parseUnits("2.0", decimal), {
           value: BigNumber.from(240).mul(unit),
         });
       await synth
         .connect(minter)
-        .approve(factory.address, BigNumber.from(2).mul(unit));
-      await factory
+        .approve(vault.address, BigNumber.from(2).mul(unit));
+      await vault
         .connect(minter)
         .userManageSynth(
-          tokenName,
           ethers.utils.parseUnits("1.6", decimal),
           BigNumber.from(160).mul(unit)
         );
       const minterBalance = BigNumber.from(240).mul(unit);
       const minterDebt = BigNumber.from(10).mul(unit);
       const minterDeposit = BigNumber.from(160).mul(unit);
-      await assertFactoryState(
+      await assertVaultState(
         minterBalance,
         minterDeposit,
         minterDeposit,
@@ -350,9 +348,9 @@ describe("#Factory", function () {
       oracle.setAssetPrice(tokenName, BigNumber.from(60).mul(unit)),
     ]);
 
-    await factory
+    await vault
       .connect(minter)
-      .userMintSynth(tokenName, ethers.utils.parseUnits("2.25", decimal), {
+      .userMintSynth(ethers.utils.parseUnits("2.25", decimal), {
         value: BigNumber.from(2700).mul(unit),
       });
     await Promise.all([
@@ -361,11 +359,11 @@ describe("#Factory", function () {
     ]);
     await synth
       .connect(liquidator)
-      .approve(factory.address, BigNumber.from(11).mul(unit));
+      .approve(vault.address, BigNumber.from(11).mul(unit));
 
-    await factory
+    await vault
       .connect(liquidator)
-      .userLiquidate(tokenName, minterAddress, BigNumber.from(11).mul(unit));
+      .userLiquidate(minterAddress, BigNumber.from(11).mul(unit));
 
     expect(await synth.balanceOf(liquidatorAddress)).to.equal(
       BigNumber.from(2).mul(unit)
@@ -384,7 +382,7 @@ describe("#Factory", function () {
     expect(await reserve.getMinterDebt(minterAddress)).to.equal(
       BigNumber.from(10).mul(unit)
     );
-    expect(await getEthBalance(factory.address)).to.equal(
+    expect(await getEthBalance(vault.address)).to.equal(
       BigNumber.from(1500).mul(unit)
     );
     const liquidatorBalance = await getEthBalance(liquidatorAddress);
