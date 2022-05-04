@@ -9,11 +9,13 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "./libraries/SafeDecimalMath.sol";
-import "hardhat/console.sol";
 
 
 contract Factory is AccessControlUpgradeable, UUPSUpgradeable {
     mapping(string => Vault) vaults;
+    string[] listedTokens;
+
+    string public constant ERR_SYNTH_NOT_AVAILABLE = "Synth not available";
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
@@ -27,12 +29,35 @@ contract Factory is AccessControlUpgradeable, UUPSUpgradeable {
 
     function _authorizeUpgrade(address newImplementation) internal onlyRole(DEFAULT_ADMIN_ROLE) override {}
 
-    function listSynth(string memory synthName, Vault vault) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        vaults[synthName] = vault;
+    function listVaults(string[] calldata _synthNames, Vault[] calldata _vaults) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_synthNames.length == _vaults.length);
+        for (uint8 i = 0; i < _vaults.length; i++) {
+            string memory synthName = _synthNames[i];
+            require(address(vaults[synthName]) == address(0));
+            vaults[synthName] = _vaults[i];
+            listedTokens.push(synthName);
+        }
     }
 
-    function delistSynth(string memory synthName) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(address(vaults[synthName]) != address(0));
-        delete vaults[synthName];
+    function delistVaults(string[] calldata synthNames) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        for (uint8 i = 0; i < synthNames.length; i++) {
+            string memory synthName = synthNames[i];
+            require(address(vaults[synthName]) != address(0));
+            delete vaults[synthName];
+        }
+    }
+
+    function listUserDebtDeposit(address account, string[] calldata tokens) public view returns (uint[] memory, uint[] memory) {
+        uint[] memory debts = new uint[](tokens.length);
+        uint[] memory deposits = new uint[](tokens.length);
+        for (uint8 i = 0; i < tokens.length; i++) {
+            string memory token = tokens[i];
+            Vault vault = vaults[token];
+            require(address(vault) != address(0), ERR_SYNTH_NOT_AVAILABLE);
+            Reserve reserve = vault.getReserve();
+            debts[i] = reserve.getMinterDebt(account);
+            deposits[i] = reserve.getMinterDeposit(account);
+        }
+        return (debts, deposits);
     }
 }

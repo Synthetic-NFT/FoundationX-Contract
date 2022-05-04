@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers, network, upgrades } from "hardhat";
 import {
   Liquidation,
-  MockOralce,
+  MockOracle,
   Reserve,
   SafeDecimalMath,
   Synth,
@@ -18,7 +18,7 @@ describe("#Vault", function () {
   let librarySafeDecimalMath: SafeDecimalMath;
   let reserve: Reserve;
   let liquidation: Liquidation;
-  let oracle: MockOralce;
+  let oracle: MockOracle;
   let synth: Synth;
   let vault: Vault;
   let decimal: number;
@@ -31,7 +31,7 @@ describe("#Vault", function () {
     librarySafeDecimalMath = await Library.deploy();
     decimal = await librarySafeDecimalMath.decimals();
     unit = await librarySafeDecimalMath.UNIT();
-    const MockOracle = await ethers.getContractFactory("MockOralce");
+    const MockOracle = await ethers.getContractFactory("MockOracle");
     oracle = await MockOracle.deploy();
   });
 

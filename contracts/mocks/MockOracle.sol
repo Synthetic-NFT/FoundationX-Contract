@@ -4,7 +4,7 @@ pragma solidity ^0.8.4;
 import "../interfaces/IOracle.sol";
 import "../libraries/SafeDecimalMath.sol";
 
-contract MockOralce is IOracle {
+contract MockOracle is IOracle {
     using SafeMath for uint;
     using SafeDecimalMath for uint;
 

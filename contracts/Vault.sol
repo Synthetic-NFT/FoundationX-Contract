@@ -22,11 +22,10 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable {
     string public constant ERR_USER_UNDER_COLLATERALIZED = "User under collateralized";
     string public constant ERR_NOT_ENOUGH_SYNTH_TO_MINT = "Not enough mintable synth";
     string public constant ERR_BURNING_EXCEED_DEBT = "Burning amount exceeds user debt";
-    string public constant ERR_SYNTH_NOT_AVAILABLE = "Synth not available";
     string public constant ERR_INVALID_TARGET_DEPOSIT = "Invalid target deposit";
     string public constant ERR_INVALID_TARGET_COLLATERAL_RATIO = "Invalid target collateral ratio";
 
-    bool private locked;
+    bool locked;
 
     event Received(address, uint);
 
@@ -56,24 +55,29 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable {
 
     function _authorizeUpgrade(address newImplementation) internal onlyRole(DEFAULT_ADMIN_ROLE) override {}
 
+    function getReserve() external view returns (Reserve) {
+        return reserve;
+    }
+
+    function getSynth() external view returns (Synth) {
+        return synth;
+    }
+
     function checkTargetCollateralRatio(uint targetCollateralRatio) private {
         require(targetCollateralRatio >= reserve.getMinCollateralRatio(), ERR_INVALID_TARGET_COLLATERAL_RATIO);
     }
 
     function userMintSynth(uint targetCollateralRatio) external payable lock {
-        require(address(synth) != address(0), ERR_SYNTH_NOT_AVAILABLE);
         checkTargetCollateralRatio(targetCollateralRatio);
         reserve.addMinterDeposit(msg.sender, msg.value);
         synth.mintSynth(msg.sender, msg.value.divideDecimal(targetCollateralRatio.multiplyDecimal(synth.getSynthPriceToEth())));
     }
 
     function userBurnSynth() external payable lock {
-        require(address(synth) != address(0), ERR_SYNTH_NOT_AVAILABLE);
         internalUserManageSynth(reserve.getMinCollateralRatio(), 0);
     }
 
     function userManageSynth(uint targetCollateralRatio, uint targetDeposit) external payable lock {
-        require(address(synth) != address(0), ERR_SYNTH_NOT_AVAILABLE);
         internalUserManageSynth(targetCollateralRatio, targetDeposit);
     }
 
