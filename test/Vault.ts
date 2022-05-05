@@ -1,7 +1,6 @@
 import { expect } from "chai";
 import { ethers, network, upgrades } from "hardhat";
 import {
-  Liquidation,
   MockOracle,
   Reserve,
   SafeDecimalMath,
@@ -17,7 +16,6 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 describe("#Vault", function () {
   let librarySafeDecimalMath: SafeDecimalMath;
   let reserve: Reserve;
-  let liquidation: Liquidation;
   let oracle: MockOracle;
   let synth: Synth;
   let vault: Vault;
@@ -39,26 +37,20 @@ describe("#Vault", function () {
     liquidationPenalty: BigNumber,
     minCollateralRatio: BigNumber
   ) {
-    const Reserve = await ethers.getContractFactory("Reserve");
-    reserve = (await upgrades.deployProxy(Reserve, [
-      minCollateralRatio,
-    ])) as Reserve;
-
-    const Liquidation = await ethers.getContractFactory("Liquidation", {
+    const Reserve = await ethers.getContractFactory("Reserve", {
       libraries: {
         SafeDecimalMath: librarySafeDecimalMath.address,
       },
     });
-    liquidation = (await upgrades.deployProxy(
-      Liquidation,
-      [reserve.address, liquidationPenalty],
+    reserve = (await upgrades.deployProxy(
+      Reserve,
+      [minCollateralRatio, liquidationPenalty],
       { unsafeAllowLinkedLibraries: true }
-    )) as Liquidation;
+    )) as Reserve;
 
     const Synth = await ethers.getContractFactory("Synth");
     synth = (await upgrades.deployProxy(Synth, [
       reserve.address,
-      liquidation.address,
       oracle.address,
       tokenName,
       tokenSymbol,
@@ -73,10 +65,7 @@ describe("#Vault", function () {
     await reserve.grantRole(await reserve.MINTER_ROLE(), vault.address);
     await reserve.grantRole(await reserve.MINTER_ROLE(), synth.address);
     await synth.grantRole(await synth.MINTER_ROLE(), vault.address);
-    await liquidation.grantRole(
-      await liquidation.DEFAULT_ADMIN_ROLE(),
-      synth.address
-    );
+    await reserve.grantRole(await reserve.DEFAULT_ADMIN_ROLE(), synth.address);
   };
 
   const setUpUserAccount = async function (

@@ -1,12 +1,6 @@
 import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
-import {
-  Liquidation,
-  MockOracle,
-  Reserve,
-  SafeDecimalMath,
-  Synth,
-} from "../typechain";
+import { MockOracle, Reserve, SafeDecimalMath, Synth } from "../typechain";
 import { beforeEach, describe, it } from "mocha";
 
 import { BigNumber } from "ethers";
@@ -15,9 +9,9 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 describe("#Synth", function () {
   let librarySafeDecimalMath: SafeDecimalMath;
   let reserve: Reserve;
-  let liquidation: Liquidation;
   let oracle: MockOracle;
   let synth: Synth;
+  let decimal: number;
   let unit: BigNumber;
   const tokenName = "CryptoPunks";
   const tokenSymbol = "$PUNK";
@@ -25,6 +19,7 @@ describe("#Synth", function () {
   beforeEach(async function () {
     const Library = await ethers.getContractFactory("SafeDecimalMath");
     librarySafeDecimalMath = await Library.deploy();
+    decimal = await librarySafeDecimalMath.decimals();
     unit = await librarySafeDecimalMath.UNIT();
     const MockOracle = await ethers.getContractFactory("MockOracle");
     oracle = await MockOracle.deploy();
@@ -34,42 +29,34 @@ describe("#Synth", function () {
     liquidationPenalty: BigNumber,
     minCollateralRatio: BigNumber
   ) {
-    const Reserve = await ethers.getContractFactory("Reserve");
-    reserve = (await upgrades.deployProxy(Reserve, [
-      minCollateralRatio,
-    ])) as Reserve;
-
-    const Liquidation = await ethers.getContractFactory("Liquidation", {
+    const Reserve = await ethers.getContractFactory("Reserve", {
       libraries: {
         SafeDecimalMath: librarySafeDecimalMath.address,
       },
     });
-    liquidation = (await upgrades.deployProxy(
-      Liquidation,
-      [reserve.address, liquidationPenalty],
+    reserve = (await upgrades.deployProxy(
+      Reserve,
+      [minCollateralRatio, liquidationPenalty],
       { unsafeAllowLinkedLibraries: true }
-    )) as Liquidation;
+    )) as Reserve;
 
     const Synth = await ethers.getContractFactory("Synth");
     synth = (await upgrades.deployProxy(Synth, [
       reserve.address,
-      liquidation.address,
       oracle.address,
       tokenName,
       tokenSymbol,
     ])) as Synth;
 
-    await liquidation.grantRole(
-      await liquidation.DEFAULT_ADMIN_ROLE(),
-      synth.address
-    );
+    await reserve.grantRole(await reserve.DEFAULT_ADMIN_ROLE(), synth.address);
     await reserve.grantRole(await reserve.MINTER_ROLE(), synth.address);
   };
 
   it("Mint burn Synth", async function () {
-    const liquidationPenalty = BigNumber.from(125).mul(unit).div(100);
-    const minCollateralRatio = BigNumber.from(150).mul(unit).div(100);
-    await setUp(liquidationPenalty, minCollateralRatio);
+    await setUp(
+      ethers.utils.parseUnits("1.25", decimal),
+      ethers.utils.parseUnits("1.5", decimal)
+    );
 
     const [owner, signer1, signer2] = await ethers.getSigners();
 
@@ -113,9 +100,10 @@ describe("#Synth", function () {
     let liquidatorAddress: string;
 
     beforeEach(async function () {
-      const liquidationPenalty = BigNumber.from(120).mul(unit).div(100);
-      const minCollateralRatio = BigNumber.from(150).mul(unit).div(100);
-      await setUp(liquidationPenalty, minCollateralRatio);
+      await setUp(
+        ethers.utils.parseUnits("1.2", decimal),
+        ethers.utils.parseUnits("1.5", decimal)
+      );
 
       const [owner, minter, liquidator] = await ethers.getSigners();
       liquidatorSigner = liquidator;
@@ -196,9 +184,7 @@ describe("#Synth", function () {
       expect(await reserve.getMinterDeposit(minterAddress)).to.equal(
         BigNumber.from(1040).mul(unit)
       );
-      expect(await liquidation.isOpenForLiquidation(minterAddress)).to.equal(
-        true
-      );
+      expect(await reserve.isOpenForLiquidation(minterAddress)).to.equal(true);
       expect(await synth.balanceOf(liquidatorAddress)).to.equal(
         BigNumber.from(0).mul(unit)
       );
@@ -235,9 +221,7 @@ describe("#Synth", function () {
       expect(await reserve.getMinterDeposit(minterAddress)).to.equal(
         BigNumber.from(1500).mul(unit)
       );
-      expect(await liquidation.isOpenForLiquidation(minterAddress)).to.equal(
-        false
-      );
+      expect(await reserve.isOpenForLiquidation(minterAddress)).to.equal(false);
       expect(await synth.balanceOf(liquidatorAddress)).to.equal(
         BigNumber.from(2).mul(unit)
       );
@@ -274,9 +258,7 @@ describe("#Synth", function () {
       expect(await reserve.getMinterDeposit(minterAddress)).to.equal(
         BigNumber.from(0).mul(unit)
       );
-      expect(await liquidation.isOpenForLiquidation(minterAddress)).to.equal(
-        false
-      );
+      expect(await reserve.isOpenForLiquidation(minterAddress)).to.equal(false);
       expect(await synth.balanceOf(liquidatorAddress)).to.equal(
         BigNumber.from(2).mul(unit)
       );

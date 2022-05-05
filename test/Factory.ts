@@ -1,7 +1,6 @@
 import {
   Factory,
   IOracle,
-  Liquidation,
   MockOracle,
   Reserve,
   SafeDecimalMath,
@@ -35,26 +34,20 @@ describe("#Factory", function () {
     tokenName: string,
     tokenSymbol: string
   ): Promise<[Reserve, Vault]> {
-    const Reserve = await ethers.getContractFactory("Reserve");
-    const reserve = (await upgrades.deployProxy(Reserve, [
-      minCollateralRatio,
-    ])) as Reserve;
-
-    const Liquidation = await ethers.getContractFactory("Liquidation", {
+    const Reserve = await ethers.getContractFactory("Reserve", {
       libraries: {
         SafeDecimalMath: librarySafeDecimalMath.address,
       },
     });
-    const liquidation = (await upgrades.deployProxy(
-      Liquidation,
-      [reserve.address, liquidationPenalty],
+    const reserve = (await upgrades.deployProxy(
+      Reserve,
+      [minCollateralRatio, liquidationPenalty],
       { unsafeAllowLinkedLibraries: true }
-    )) as Liquidation;
+    )) as Reserve;
 
     const Synth = await ethers.getContractFactory("Synth");
     const synth = (await upgrades.deployProxy(Synth, [
       reserve.address,
-      liquidation.address,
       oracle.address,
       tokenName,
       tokenSymbol,
@@ -70,10 +63,7 @@ describe("#Factory", function () {
     await reserve.grantRole(await reserve.MINTER_ROLE(), synth.address);
     await reserve.grantRole(await reserve.MINTER_ROLE(), ownerAddress);
     await synth.grantRole(await synth.MINTER_ROLE(), vault.address);
-    await liquidation.grantRole(
-      await liquidation.DEFAULT_ADMIN_ROLE(),
-      synth.address
-    );
+    await reserve.grantRole(await reserve.DEFAULT_ADMIN_ROLE(), synth.address);
 
     return [reserve, vault];
   };
