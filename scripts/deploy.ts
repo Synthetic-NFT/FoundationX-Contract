@@ -66,6 +66,7 @@ async function main() {
     synth.address,
     reserve.address,
   ])) as Vault;
+  console.log("Vault deployed to:", vault.address);
 
   await reserve.grantRole(await reserve.MINTER_ROLE(), vault.address);
   await reserve.grantRole(await reserve.MINTER_ROLE(), synth.address);
