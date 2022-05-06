@@ -69,7 +69,7 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable {
 
     function userMintSynth(uint targetCollateralRatio) external payable lock {
         checkTargetCollateralRatio(targetCollateralRatio);
-        reserve.addMinterDeposit(msg.sender, msg.value);
+        reserve.addMinterDepositETH(msg.sender, msg.value);
         synth.mintSynth(msg.sender, msg.value.divideDecimal(targetCollateralRatio.multiplyDecimal(synth.getSynthPriceToEth())));
     }
 
@@ -85,11 +85,11 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable {
         checkTargetCollateralRatio(targetCollateralRatio);
 
         if (msg.value > 0) {
-            reserve.addMinterDeposit(msg.sender, msg.value);
-            require(reserve.getMinterDeposit(msg.sender) == targetDeposit, ERR_INVALID_TARGET_DEPOSIT);
+            reserve.addMinterDepositETH(msg.sender, msg.value);
+            require(reserve.getMinterDepositETH(msg.sender) == targetDeposit, ERR_INVALID_TARGET_DEPOSIT);
         }
 
-        uint originalDebt = reserve.getMinterDebt(msg.sender);
+        uint originalDebt = reserve.getMinterDebtETH(msg.sender);
         uint targetDebt = targetDeposit.divideDecimal(targetCollateralRatio).divideDecimal(synth.getSynthPriceToEth());
         if (originalDebt > targetDebt) {
             synth.burnSynth(msg.sender, msg.sender, originalDebt.sub(targetDebt));
@@ -97,9 +97,9 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable {
             synth.mintSynth(msg.sender, targetDebt - originalDebt);
         }
 
-        uint originalDeposit = reserve.getMinterDeposit(msg.sender);
+        uint originalDeposit = reserve.getMinterDepositETH(msg.sender);
         if (originalDeposit > targetDeposit) {
-            reserve.reduceMinterDeposit(msg.sender, originalDeposit - targetDeposit);
+            reserve.reduceMinterDepositETH(msg.sender, originalDeposit - targetDeposit);
             payable(msg.sender).transfer(originalDeposit - targetDeposit);
         }
     }

@@ -55,8 +55,8 @@ contract Factory is AccessControlUpgradeable, UUPSUpgradeable {
             Vault vault = vaults[token];
             require(address(vault) != address(0), ERR_SYNTH_NOT_AVAILABLE);
             Reserve reserve = vault.getReserve();
-            debts[i] = reserve.getMinterDebt(account);
-            deposits[i] = reserve.getMinterDeposit(account);
+            debts[i] = reserve.getMinterDebtETH(account);
+            deposits[i] = reserve.getMinterDepositETH(account);
         }
         return (debts, deposits);
     }
