@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { ethers, network, upgrades } from "hardhat";
+import { ethers, network } from "hardhat";
 import {
   MockOracle,
   Reserve,
@@ -12,6 +12,7 @@ import { BigNumber } from "ethers";
 import { getEthBalance } from "./shared/address";
 import { closeBigNumber } from "./shared/math";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { deployReserve, deploySynth, deployVault } from "./shared/constructor";
 
 describe("#Vault", function () {
   let librarySafeDecimalMath: SafeDecimalMath;
@@ -34,38 +35,18 @@ describe("#Vault", function () {
   });
 
   const setUp = async function (
+    minCollateralRatio: BigNumber,
     liquidationPenalty: BigNumber,
-    minCollateralRatio: BigNumber
+    NFTAddress: string,
+    lockingPeriod: BigNumber
   ) {
-    const Reserve = await ethers.getContractFactory("Reserve", {
-      libraries: {
-        SafeDecimalMath: librarySafeDecimalMath.address,
-      },
-    });
-    reserve = (await upgrades.deployProxy(
-      Reserve,
-      [minCollateralRatio, liquidationPenalty],
-      { unsafeAllowLinkedLibraries: true }
-    )) as Reserve;
-
-    const Synth = await ethers.getContractFactory("Synth");
-    synth = (await upgrades.deployProxy(Synth, [
-      reserve.address,
-      oracle.address,
-      tokenName,
-      tokenSymbol,
-    ])) as Synth;
-
-    const Vault = await ethers.getContractFactory("Vault");
-    vault = (await upgrades.deployProxy(Vault, [
-      synth.address,
-      reserve.address,
-    ])) as Vault;
-
-    await reserve.grantRole(await reserve.MINTER_ROLE(), vault.address);
-    await reserve.grantRole(await reserve.MINTER_ROLE(), synth.address);
-    await synth.grantRole(await synth.MINTER_ROLE(), vault.address);
-    await reserve.grantRole(await reserve.DEFAULT_ADMIN_ROLE(), synth.address);
+    reserve = await deployReserve(
+      librarySafeDecimalMath,
+      minCollateralRatio,
+      liquidationPenalty
+    );
+    synth = await deploySynth(reserve, oracle, tokenName, tokenSymbol);
+    vault = await deployVault(synth, reserve, NFTAddress, lockingPeriod);
   };
 
   const setUpUserAccount = async function (
@@ -85,8 +66,13 @@ describe("#Vault", function () {
     beforeEach(async function () {
       const liquidationPenalty = ethers.utils.parseUnits("1.2", decimal);
       const minCollateralRatio = ethers.utils.parseUnits("1.5", decimal);
-      await setUp(liquidationPenalty, minCollateralRatio);
-      const [_, minterSigner] = await ethers.getSigners();
+      const [_, minterSigner, NFTContract] = await ethers.getSigners();
+      await setUp(
+        minCollateralRatio,
+        liquidationPenalty,
+        NFTContract.address,
+        BigNumber.from(0).mul(unit)
+      );
       minter = minterSigner;
       minterAddress = minter.address;
       await Promise.all([
@@ -99,7 +85,7 @@ describe("#Vault", function () {
       await expect(
         vault
           .connect(minter)
-          .userMintSynth(ethers.utils.parseUnits("1.4", decimal), {
+          .userMintSynthETH(ethers.utils.parseUnits("1.4", decimal), {
             value: BigNumber.from(200).mul(unit),
           })
       ).to.be.revertedWith(await vault.ERR_INVALID_TARGET_COLLATERAL_RATIO());
@@ -114,11 +100,13 @@ describe("#Vault", function () {
       ) {
         await vault
           .connect(minter)
-          .userMintSynth(collateralRatio, { value: mintDeposit });
+          .userMintSynthETH(collateralRatio, { value: mintDeposit });
         expect(await getEthBalance(vault.address)).to.equal(postDeposit);
         expect(await synth.balanceOf(minterAddress)).to.equal(postDebt);
-        expect(await reserve.getMinterDebt(minterAddress)).to.equal(postDebt);
-        expect(await reserve.getMinterDeposit(minterAddress)).to.equal(
+        expect(await reserve.getMinterDebtETH(minterAddress)).to.equal(
+          postDebt
+        );
+        expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
           postDeposit
         );
       };
@@ -141,8 +129,13 @@ describe("#Vault", function () {
   it("User burn synth", async function () {
     const liquidationPenalty = ethers.utils.parseUnits("1.2", decimal);
     const minCollateralRatio = ethers.utils.parseUnits("1.5", decimal);
-    await setUp(liquidationPenalty, minCollateralRatio);
-    const [_, minter] = await ethers.getSigners();
+    const [_, minter, NFTContract] = await ethers.getSigners();
+    await setUp(
+      minCollateralRatio,
+      liquidationPenalty,
+      NFTContract.address,
+      BigNumber.from(0).mul(unit)
+    );
     const minterAddress = minter.address;
 
     await Promise.all([
@@ -151,13 +144,13 @@ describe("#Vault", function () {
     ]);
     await vault
       .connect(minter)
-      .userMintSynth(ethers.utils.parseUnits("1.6", decimal), {
+      .userMintSynthETH(ethers.utils.parseUnits("1.6", decimal), {
         value: BigNumber.from(320).mul(unit),
       });
     await synth
       .connect(minter)
       .approve(vault.address, BigNumber.from(20).mul(unit));
-    await vault.connect(minter).userBurnSynth();
+    await vault.connect(minter).userBurnSynthETH();
 
     expect(await getEthBalance(vault.address)).to.equal(
       BigNumber.from(0).mul(unit)
@@ -165,10 +158,10 @@ describe("#Vault", function () {
     expect(await synth.balanceOf(minterAddress)).to.equal(
       BigNumber.from(0).mul(unit)
     );
-    expect(await reserve.getMinterDebt(minterAddress)).to.equal(
+    expect(await reserve.getMinterDebtETH(minterAddress)).to.equal(
       BigNumber.from(0).mul(unit)
     );
-    expect(await reserve.getMinterDeposit(minterAddress)).to.equal(
+    expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
       BigNumber.from(0).mul(unit)
     );
     const minterEthBalance = await getEthBalance(minterAddress);
@@ -188,8 +181,13 @@ describe("#Vault", function () {
     beforeEach(async function () {
       const liquidationPenalty = ethers.utils.parseUnits("1.2", decimal);
       const minCollateralRatio = ethers.utils.parseUnits("1.5", decimal);
-      await setUp(liquidationPenalty, minCollateralRatio);
-      const [_, minterSigner] = await ethers.getSigners();
+      const [_, minterSigner, NFTContract] = await ethers.getSigners();
+      await setUp(
+        minCollateralRatio,
+        liquidationPenalty,
+        NFTContract.address,
+        BigNumber.from(0).mul(unit)
+      );
       minter = minterSigner;
       minterAddress = minter.address;
       await Promise.all([
@@ -206,8 +204,10 @@ describe("#Vault", function () {
     ) {
       expect(await getEthBalance(vault.address)).to.equal(vaultBalance);
       expect(await synth.balanceOf(minterAddress)).to.equal(minterDebt);
-      expect(await reserve.getMinterDebt(minterAddress)).to.equal(minterDebt);
-      expect(await reserve.getMinterDeposit(minterAddress)).to.equal(
+      expect(await reserve.getMinterDebtETH(minterAddress)).to.equal(
+        minterDebt
+      );
+      expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
         minterDeposit
       );
       expect(
@@ -222,12 +222,12 @@ describe("#Vault", function () {
     it("Add deposit add debt", async function () {
       await vault
         .connect(minter)
-        .userMintSynth(ethers.utils.parseUnits("1.6", decimal), {
+        .userMintSynthETH(ethers.utils.parseUnits("1.6", decimal), {
           value: BigNumber.from(160).mul(unit),
         });
       await vault
         .connect(minter)
-        .userManageSynth(
+        .userManageSynthETH(
           ethers.utils.parseUnits("1.7", decimal),
           BigNumber.from(340).mul(unit),
           { value: BigNumber.from(180).mul(unit) }
@@ -246,7 +246,7 @@ describe("#Vault", function () {
     it("Add deposit reduce debt", async function () {
       await vault
         .connect(minter)
-        .userMintSynth(ethers.utils.parseUnits("1.6", decimal), {
+        .userMintSynthETH(ethers.utils.parseUnits("1.6", decimal), {
           value: BigNumber.from(160).mul(unit),
         });
       await synth
@@ -254,7 +254,7 @@ describe("#Vault", function () {
         .approve(vault.address, BigNumber.from(1).mul(unit));
       await vault
         .connect(minter)
-        .userManageSynth(
+        .userManageSynthETH(
           ethers.utils.parseUnits("2.0", decimal),
           BigNumber.from(180).mul(unit),
           { value: BigNumber.from(20).mul(unit) }
@@ -273,12 +273,12 @@ describe("#Vault", function () {
     it("Reduce deposit add debt", async function () {
       await vault
         .connect(minter)
-        .userMintSynth(ethers.utils.parseUnits("2.0", decimal), {
+        .userMintSynthETH(ethers.utils.parseUnits("2.0", decimal), {
           value: BigNumber.from(180).mul(unit),
         });
       await vault
         .connect(minter)
-        .userManageSynth(
+        .userManageSynthETH(
           ethers.utils.parseUnits("1.6", decimal),
           BigNumber.from(160).mul(unit)
         );
@@ -296,7 +296,7 @@ describe("#Vault", function () {
     it("Reduce deposit reduce debt", async function () {
       await vault
         .connect(minter)
-        .userMintSynth(ethers.utils.parseUnits("2.0", decimal), {
+        .userMintSynthETH(ethers.utils.parseUnits("2.0", decimal), {
           value: BigNumber.from(240).mul(unit),
         });
       await synth
@@ -304,7 +304,7 @@ describe("#Vault", function () {
         .approve(vault.address, BigNumber.from(2).mul(unit));
       await vault
         .connect(minter)
-        .userManageSynth(
+        .userManageSynthETH(
           ethers.utils.parseUnits("1.6", decimal),
           BigNumber.from(160).mul(unit)
         );
@@ -323,8 +323,13 @@ describe("#Vault", function () {
   it("User liquidate", async function () {
     const liquidationPenalty = ethers.utils.parseUnits("1.2", decimal);
     const minCollateralRatio = ethers.utils.parseUnits("1.5", decimal);
-    await setUp(liquidationPenalty, minCollateralRatio);
-    const [_, minter, liquidator] = await ethers.getSigners();
+    const [_, minter, liquidator, NFTContract] = await ethers.getSigners();
+    await setUp(
+      minCollateralRatio,
+      liquidationPenalty,
+      NFTContract.address,
+      BigNumber.from(0).mul(unit)
+    );
     const minterAddress = minter.address;
     const liquidatorAddress = liquidator.address;
 
@@ -339,7 +344,7 @@ describe("#Vault", function () {
 
     await vault
       .connect(minter)
-      .userMintSynth(ethers.utils.parseUnits("2.25", decimal), {
+      .userMintSynthETH(ethers.utils.parseUnits("2.25", decimal), {
         value: BigNumber.from(2700).mul(unit),
       });
     await Promise.all([
@@ -352,7 +357,7 @@ describe("#Vault", function () {
 
     await vault
       .connect(liquidator)
-      .userLiquidate(minterAddress, BigNumber.from(11).mul(unit));
+      .userLiquidateETH(minterAddress, BigNumber.from(11).mul(unit));
 
     expect(await synth.balanceOf(liquidatorAddress)).to.equal(
       BigNumber.from(2).mul(unit)
@@ -360,7 +365,7 @@ describe("#Vault", function () {
     expect(await synth.balanceOf(minterAddress)).to.equal(
       BigNumber.from(20).mul(unit)
     );
-    const minterDeposit = await reserve.getMinterDebt(minterAddress);
+    const minterDeposit = await reserve.getMinterDebtETH(minterAddress);
     expect(
       closeBigNumber(
         minterDeposit,
@@ -368,7 +373,7 @@ describe("#Vault", function () {
         BigNumber.from(1).mul(unit.sub(4))
       )
     );
-    expect(await reserve.getMinterDebt(minterAddress)).to.equal(
+    expect(await reserve.getMinterDebtETH(minterAddress)).to.equal(
       BigNumber.from(10).mul(unit)
     );
     expect(await getEthBalance(vault.address)).to.equal(

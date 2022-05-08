@@ -6,27 +6,33 @@ import "./libraries/SafeDecimalMath.sol";
 
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 
 contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
 
     using SafeMath for uint;
     using SafeDecimalMath for uint;
+    using EnumerableSet for EnumerableSet.UintSet;
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
-    mapping(address => uint) minterDebtBalance;
-    mapping(address => uint) minterDepositBalance;
+    mapping(address => uint) minterDebtBalanceETH;
+    mapping(address => uint) minterDepositBalanceETH;
+    mapping(address => EnumerableSet.UintSet) minterDepositBalanceNFT;
     mapping(address => bool) liquidatableUsers;
-    uint minCollateralRatio;
+
+    uint256 minCollateralRatio;
     uint256 liquidationPenalty;
+
+    string public constant ERR_NFT_NOT_OWNED_BY_MINTER = "NFT not owned by minter";
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
     function initialize(
-        uint _minCollateralRatio,
+        uint256 _minCollateralRatio,
         uint256 _liquidationPenalty
     ) initializer public {
         __AccessControl_init();
@@ -61,31 +67,58 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
     }
 
     function getMinterCollateralRatio(address minter, uint assetPrice) public view returns (uint) {
-        return minterDepositBalance[minter].divideDecimal(minterDebtBalance[minter].multiplyDecimal(assetPrice));
+        return minterDepositBalanceETH[minter].divideDecimal(minterDebtBalanceETH[minter].multiplyDecimal(assetPrice));
     }
 
-    function addMinterDebt(address minter, uint amount) public onlyRole(MINTER_ROLE) {
-        minterDebtBalance[minter] += amount;
+    function addMinterDebtETH(address minter, uint amount) public onlyRole(MINTER_ROLE) {
+        minterDebtBalanceETH[minter] += amount;
     }
 
-    function reduceMinterDebt(address minter, uint amount) public onlyRole(MINTER_ROLE) {
-        minterDebtBalance[minter] -= amount;
+    function reduceMinterDebtETH(address minter, uint amount) public onlyRole(MINTER_ROLE) {
+        minterDebtBalanceETH[minter] -= amount;
+    }
+
+    function getMinterDebtETH(address minter) public view returns (uint) {
+        return minterDebtBalanceETH[minter];
+    }
+
+    function getMinterDebtNFT(address minter) public view returns (uint) {
+        EnumerableSet.UintSet storage minterHoldings = minterDepositBalanceNFT[minter];
+        return minterHoldings.length();
     }
 
     function getMinterDebt(address minter) public view returns (uint) {
-        return minterDebtBalance[minter];
+        return getMinterDebtETH(minter) + getMinterDebtNFT(minter);
     }
 
-    function addMinterDeposit(address minter, uint amount) public onlyRole(MINTER_ROLE) {
-        minterDepositBalance[minter] += amount;
+    function addMinterDepositETH(address minter, uint amount) public onlyRole(MINTER_ROLE) {
+        minterDepositBalanceETH[minter] += amount;
     }
 
-    function reduceMinterDeposit(address minter, uint amount) public onlyRole(MINTER_ROLE) {
-        minterDepositBalance[minter] -= amount;
+    function reduceMinterDepositETH(address minter, uint amount) public onlyRole(MINTER_ROLE) {
+        minterDepositBalanceETH[minter] -= amount;
     }
 
-    function getMinterDeposit(address minter) public view returns (uint) {
-        return minterDepositBalance[minter];
+    function getMinterDepositETH(address minter) public view returns (uint) {
+        return minterDepositBalanceETH[minter];
+    }
+
+    function addMinterDepositNFT(address minter, uint tokenId) public onlyRole(MINTER_ROLE) {
+        minterDepositBalanceNFT[minter].add(tokenId);
+    }
+
+    function reduceMinterDepositNFT(address minter, uint tokenId) public onlyRole(MINTER_ROLE) {
+        require(minterDepositBalanceNFT[minter].contains(tokenId), ERR_NFT_NOT_OWNED_BY_MINTER);
+        minterDepositBalanceNFT[minter].remove(tokenId);
+    }
+
+    function getMinterDepositNFT(address minter) public view returns (uint[] memory) {
+        EnumerableSet.UintSet storage minterHoldings = minterDepositBalanceNFT[minter];
+        uint[] memory tokenIds = new uint[](minterHoldings.length());
+        for (uint i = 0; i < tokenIds.length; i++) {
+            tokenIds[i] = minterHoldings.at(i);
+        }
+        return tokenIds;
     }
 
     function isOpenForLiquidation(address account) public view returns (bool) {
@@ -95,7 +128,7 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
     // Mutative Functions
     // Note that it's caller's responsibility to verify the collateral ratio of account satisfies the liquidaation criteria.
     function flagAccountForLiquidation(address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(getMinterDebt(account) > 0, "Invalid account");
+        require(getMinterDebtETH(account) > 0, "Invalid account");
         liquidatableUsers[account] = true;
     }
 

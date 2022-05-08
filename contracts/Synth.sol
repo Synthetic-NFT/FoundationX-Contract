@@ -78,18 +78,18 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
 
     function mintSynth(address minter, uint amount) public onlyRole(MINTER_ROLE) {
         _mint(minter, amount);
-        reserve.addMinterDebt(minter, amount);
+        reserve.addMinterDebtETH(minter, amount);
     }
 
     function burnSynth(address debtAccount, address burnAccount, uint amount) public onlyRole(MINTER_ROLE) {
-        uint existingDebt = reserve.getMinterDebt(debtAccount);
+        uint existingDebt = reserve.getMinterDebtETH(debtAccount);
         uint amountBurnt = existingDebt < amount ? existingDebt : amount;
 
         // synth.burn does a safe subtraction on balance (so it will revert if there are not enough synths).
         burnFrom(burnAccount, amountBurnt);
 
         // Account for the burnt debt in the cache.
-        reserve.reduceMinterDebt(debtAccount, amountBurnt);
+        reserve.reduceMinterDebtETH(debtAccount, amountBurnt);
     }
 
     function liquidateDelinquentAccount(
@@ -99,7 +99,7 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
     ) external returns (uint totalRedeemed, uint amountToLiquidate) {
         // Check account is liquidation open
         uint synthPrice = getSynthPriceToEth();
-        uint minterDebt = reserve.getMinterDebt(account);
+        uint minterDebt = reserve.getMinterDebtETH(account);
         uint minterCollateralRatio = reserve.getMinterCollateralRatio(account, synthPrice);
         require(minterCollateralRatio <= reserve.getMinCollateralRatio(), ERR_LIQUIDATE_ABOVE_MIN_COLLATERAL_RATIO);
 
@@ -114,7 +114,7 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
         uint debtBalance = synthPrice.multiplyDecimal(minterDebt);
         uint liquidateSynthEthValue = synthPrice.multiplyDecimal(synthAmount > minterDebt ? minterDebt : synthAmount);
 
-        uint collateralForAccount = reserve.getMinterDeposit(account);
+        uint collateralForAccount = reserve.getMinterDepositETH(account);
 
         uint amountToFixCollateralRatio = reserve.calculateAmountToFixCollateral(debtBalance, collateralForAccount);
 
@@ -140,7 +140,7 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
 
         // burn sUSD from messageSender (liquidator) and reduce account's debt
         burnSynth(account, liquidator, synthLiquidated);
-        reserve.reduceMinterDeposit(account, totalRedeemed);
+        reserve.reduceMinterDepositETH(account, totalRedeemed);
         // Remove liquidation flag if amount liquidated fixes ratio
         if (amountToLiquidate >= amountToFixCollateralRatio || synthLiquidated >= minterDebt) {
             // Remove liquidation
