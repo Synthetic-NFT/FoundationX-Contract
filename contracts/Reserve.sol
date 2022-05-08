@@ -13,7 +13,7 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
 
     using SafeMath for uint;
     using SafeDecimalMath for uint;
-    using EnumerableSet for EnumerableSet.AddressSet;
+    using EnumerableSet for EnumerableSet.UintSet;
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
@@ -21,20 +21,18 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
     mapping(address => uint) minterDebtBalanceETH;
     mapping(address => uint) minterDepositBalanceETH;
     mapping(address => EnumerableSet.UintSet) minterDepositBalanceNFT;
-    EnumerableSet.UintSet holdings;
     mapping(address => bool) liquidatableUsers;
 
-    uint minCollateralRatio;
+    uint256 minCollateralRatio;
     uint256 liquidationPenalty;
 
-    string public constant ERR_NFT_ALREADY_IN_HOLDINGS = "NFT already in holdings";
     string public constant ERR_NFT_NOT_OWNED_BY_MINTER = "NFT not owned by minter";
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
     function initialize(
-        uint _minCollateralRatio,
+        uint256 _minCollateralRatio,
         uint256 _liquidationPenalty
     ) initializer public {
         __AccessControl_init();
@@ -86,7 +84,7 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
 
     function getMinterDebtNFT(address minter) public view returns (uint) {
         EnumerableSet.UintSet storage minterHoldings = minterDepositBalanceNFT[minter];
-        return EnumerableSet.length(minterHoldings);
+        return minterHoldings.length();
     }
 
     function getMinterDebt(address minter) public view returns (uint) {
@@ -106,22 +104,19 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
     }
 
     function addMinterDepositNFT(address minter, uint tokenId) public onlyRole(MINTER_ROLE) {
-        require(!EnumerableSet.contains(holdings, tokenId), ERR_NFT_ALREADY_IN_HOLDINGS);
-        EnumerableSet.add(holdings, tokenId);
-        EnumerableSet.add(minterDepositBalanceNFT[minter], tokenId);
+        minterDepositBalanceNFT[minter].add(tokenId);
     }
 
     function reduceMinterDepositNFT(address minter, uint tokenId) public onlyRole(MINTER_ROLE) {
-        require(EnumerableSet.contains(minterDepositBalanceNFT[minter], tokenId), ERR_NFT_NOT_OWNED_BY_MINTER);
-        EnumerableSet.remove(holdings, tokenId);
-        EnumerableSet.remove(minterDepositBalanceNFT[minter], tokenId);
+        require(minterDepositBalanceNFT[minter].contains(tokenId), ERR_NFT_NOT_OWNED_BY_MINTER);
+        minterDepositBalanceNFT[minter].remove(tokenId);
     }
 
     function getMinterDepositNFT(address minter) public view returns (uint[] memory) {
         EnumerableSet.UintSet storage minterHoldings = minterDepositBalanceNFT[minter];
-        uint[] memory tokenIds = new uint[](EnumerableSet.length(minterHoldings));
-        for (uint8 i = 0; i < tokenIds.length; i++) {
-            tokenIds[i] = EnumerableSet.at(minterHoldings, i);
+        uint[] memory tokenIds = new uint[](minterHoldings.length());
+        for (uint i = 0; i < tokenIds.length; i++) {
+            tokenIds[i] = minterHoldings.at(i);
         }
         return tokenIds;
     }
