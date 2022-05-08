@@ -3,6 +3,7 @@ import { ethers, upgrades } from "hardhat";
 import { Reserve, SafeDecimalMath } from "../typechain";
 import { beforeEach, it } from "mocha";
 import { BigNumber } from "ethers";
+import { deployReserve } from "./shared/constructor";
 
 describe("#Reserve", function () {
   let librarySafeDecimalMath: SafeDecimalMath;
@@ -21,16 +22,11 @@ describe("#Reserve", function () {
     minCollateralRatio: BigNumber,
     liquidationPenalty: BigNumber
   ) {
-    const Reserve = await ethers.getContractFactory("Reserve", {
-      libraries: {
-        SafeDecimalMath: librarySafeDecimalMath.address,
-      },
-    });
-    reserve = (await upgrades.deployProxy(
-      Reserve,
-      [minCollateralRatio, liquidationPenalty],
-      { unsafeAllowLinkedLibraries: true }
-    )) as Reserve;
+    reserve = await deployReserve(
+      librarySafeDecimalMath,
+      minCollateralRatio,
+      liquidationPenalty
+    );
   };
 
   it("Minter collateral ratio", async function () {

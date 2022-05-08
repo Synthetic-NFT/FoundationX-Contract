@@ -4,13 +4,13 @@ import {
   MockOracle,
   Reserve,
   SafeDecimalMath,
-  Synth,
   Vault,
 } from "../typechain";
 import { BigNumber } from "ethers";
 import { ethers, upgrades } from "hardhat";
 import { describe, it } from "mocha";
 import { expect } from "chai";
+import { deployReserve, deploySynth, deployVault } from "./shared/constructor";
 
 describe("#Factory", function () {
   let librarySafeDecimalMath: SafeDecimalMath;
@@ -29,47 +29,26 @@ describe("#Factory", function () {
   let factory: Factory;
 
   const setUpVault = async function (
-    liquidationPenalty: BigNumber,
     minCollateralRatio: BigNumber,
+    liquidationPenalty: BigNumber,
     tokenName: string,
-    tokenSymbol: string
+    tokenSymbol: string,
+    NFTAddress: string,
+    lockingPeriod: BigNumber
   ): Promise<[Reserve, Vault]> {
-    const Reserve = await ethers.getContractFactory("Reserve", {
-      libraries: {
-        SafeDecimalMath: librarySafeDecimalMath.address,
-      },
-    });
-    const reserve = (await upgrades.deployProxy(
-      Reserve,
-      [minCollateralRatio, liquidationPenalty],
-      { unsafeAllowLinkedLibraries: true }
-    )) as Reserve;
-
-    const Synth = await ethers.getContractFactory("Synth");
-    const synth = (await upgrades.deployProxy(Synth, [
-      reserve.address,
-      oracle.address,
-      tokenName,
-      tokenSymbol,
-    ])) as Synth;
-
-    const Vault = await ethers.getContractFactory("Vault");
-    const vault = (await upgrades.deployProxy(Vault, [
-      synth.address,
-      reserve.address,
-    ])) as Vault;
-
-    await reserve.grantRole(await reserve.MINTER_ROLE(), vault.address);
-    await reserve.grantRole(await reserve.MINTER_ROLE(), synth.address);
+    const reserve = await deployReserve(
+      librarySafeDecimalMath,
+      minCollateralRatio,
+      liquidationPenalty
+    );
+    const synth = await deploySynth(reserve, oracle, tokenName, tokenSymbol);
+    const vault = await deployVault(synth, reserve, NFTAddress, lockingPeriod);
     await reserve.grantRole(await reserve.MINTER_ROLE(), ownerAddress);
-    await synth.grantRole(await synth.MINTER_ROLE(), vault.address);
-    await reserve.grantRole(await reserve.DEFAULT_ADMIN_ROLE(), synth.address);
-
     return [reserve, vault];
   };
 
   beforeEach(async function () {
-    const [owner] = await ethers.getSigners();
+    const [owner, NFTContract] = await ethers.getSigners();
     ownerAddress = owner.address;
     const Library = await ethers.getContractFactory("SafeDecimalMath");
     librarySafeDecimalMath = await Library.deploy();
@@ -78,16 +57,20 @@ describe("#Factory", function () {
     const MockOracle = await ethers.getContractFactory("MockOracle");
     oracle = await MockOracle.deploy();
     [reserve1, vault1] = await setUpVault(
-      ethers.utils.parseUnits("1.2", decimal),
       ethers.utils.parseUnits("1.5", decimal),
+      ethers.utils.parseUnits("1.2", decimal),
       tokenName1,
-      tokenSymbol1
+      tokenSymbol1,
+      NFTContract.address,
+      BigNumber.from(0).mul(unit)
     );
     [reserve2, vault2] = await setUpVault(
-      ethers.utils.parseUnits("1.2", decimal),
       ethers.utils.parseUnits("1.5", decimal),
+      ethers.utils.parseUnits("1.2", decimal),
       tokenName2,
-      tokenSymbol2
+      tokenSymbol2,
+      NFTContract.address,
+      BigNumber.from(0).mul(unit)
     );
     const Factory = await ethers.getContractFactory("Factory");
     factory = (await upgrades.deployProxy(Factory, [])) as Factory;

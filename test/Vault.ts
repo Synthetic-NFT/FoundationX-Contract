@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { ethers, network, upgrades } from "hardhat";
+import { ethers, network } from "hardhat";
 import {
   MockOracle,
   Reserve,
@@ -12,6 +12,7 @@ import { BigNumber } from "ethers";
 import { getEthBalance } from "./shared/address";
 import { closeBigNumber } from "./shared/math";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { deployReserve, deploySynth, deployVault } from "./shared/constructor";
 
 describe("#Vault", function () {
   let librarySafeDecimalMath: SafeDecimalMath;
@@ -34,38 +35,18 @@ describe("#Vault", function () {
   });
 
   const setUp = async function (
+    minCollateralRatio: BigNumber,
     liquidationPenalty: BigNumber,
-    minCollateralRatio: BigNumber
+    NFTAddress: string,
+    lockingPeriod: BigNumber
   ) {
-    const Reserve = await ethers.getContractFactory("Reserve", {
-      libraries: {
-        SafeDecimalMath: librarySafeDecimalMath.address,
-      },
-    });
-    reserve = (await upgrades.deployProxy(
-      Reserve,
-      [minCollateralRatio, liquidationPenalty],
-      { unsafeAllowLinkedLibraries: true }
-    )) as Reserve;
-
-    const Synth = await ethers.getContractFactory("Synth");
-    synth = (await upgrades.deployProxy(Synth, [
-      reserve.address,
-      oracle.address,
-      tokenName,
-      tokenSymbol,
-    ])) as Synth;
-
-    const Vault = await ethers.getContractFactory("Vault");
-    vault = (await upgrades.deployProxy(Vault, [
-      synth.address,
-      reserve.address,
-    ])) as Vault;
-
-    await reserve.grantRole(await reserve.MINTER_ROLE(), vault.address);
-    await reserve.grantRole(await reserve.MINTER_ROLE(), synth.address);
-    await synth.grantRole(await synth.MINTER_ROLE(), vault.address);
-    await reserve.grantRole(await reserve.DEFAULT_ADMIN_ROLE(), synth.address);
+    reserve = await deployReserve(
+      librarySafeDecimalMath,
+      minCollateralRatio,
+      liquidationPenalty
+    );
+    synth = await deploySynth(reserve, oracle, tokenName, tokenSymbol);
+    vault = await deployVault(synth, reserve, NFTAddress, lockingPeriod);
   };
 
   const setUpUserAccount = async function (
@@ -85,8 +66,13 @@ describe("#Vault", function () {
     beforeEach(async function () {
       const liquidationPenalty = ethers.utils.parseUnits("1.2", decimal);
       const minCollateralRatio = ethers.utils.parseUnits("1.5", decimal);
-      await setUp(liquidationPenalty, minCollateralRatio);
-      const [_, minterSigner] = await ethers.getSigners();
+      const [_, minterSigner, NFTContract] = await ethers.getSigners();
+      await setUp(
+        minCollateralRatio,
+        liquidationPenalty,
+        NFTContract.address,
+        BigNumber.from(0).mul(unit)
+      );
       minter = minterSigner;
       minterAddress = minter.address;
       await Promise.all([
@@ -143,8 +129,13 @@ describe("#Vault", function () {
   it("User burn synth", async function () {
     const liquidationPenalty = ethers.utils.parseUnits("1.2", decimal);
     const minCollateralRatio = ethers.utils.parseUnits("1.5", decimal);
-    await setUp(liquidationPenalty, minCollateralRatio);
-    const [_, minter] = await ethers.getSigners();
+    const [_, minter, NFTContract] = await ethers.getSigners();
+    await setUp(
+      minCollateralRatio,
+      liquidationPenalty,
+      NFTContract.address,
+      BigNumber.from(0).mul(unit)
+    );
     const minterAddress = minter.address;
 
     await Promise.all([
@@ -190,8 +181,13 @@ describe("#Vault", function () {
     beforeEach(async function () {
       const liquidationPenalty = ethers.utils.parseUnits("1.2", decimal);
       const minCollateralRatio = ethers.utils.parseUnits("1.5", decimal);
-      await setUp(liquidationPenalty, minCollateralRatio);
-      const [_, minterSigner] = await ethers.getSigners();
+      const [_, minterSigner, NFTContract] = await ethers.getSigners();
+      await setUp(
+        minCollateralRatio,
+        liquidationPenalty,
+        NFTContract.address,
+        BigNumber.from(0).mul(unit)
+      );
       minter = minterSigner;
       minterAddress = minter.address;
       await Promise.all([
@@ -327,8 +323,13 @@ describe("#Vault", function () {
   it("User liquidate", async function () {
     const liquidationPenalty = ethers.utils.parseUnits("1.2", decimal);
     const minCollateralRatio = ethers.utils.parseUnits("1.5", decimal);
-    await setUp(liquidationPenalty, minCollateralRatio);
-    const [_, minter, liquidator] = await ethers.getSigners();
+    const [_, minter, liquidator, NFTContract] = await ethers.getSigners();
+    await setUp(
+      minCollateralRatio,
+      liquidationPenalty,
+      NFTContract.address,
+      BigNumber.from(0).mul(unit)
+    );
     const minterAddress = minter.address;
     const liquidatorAddress = liquidator.address;
 

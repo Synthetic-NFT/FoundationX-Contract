@@ -5,6 +5,7 @@ import { beforeEach, describe, it } from "mocha";
 
 import { BigNumber } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { deployReserve, deploySynth } from "./shared/constructor";
 
 describe("#Synth", function () {
   let librarySafeDecimalMath: SafeDecimalMath;
@@ -26,36 +27,21 @@ describe("#Synth", function () {
   });
 
   const setUp = async function (
-    liquidationPenalty: BigNumber,
-    minCollateralRatio: BigNumber
+    minCollateralRatio: BigNumber,
+    liquidationPenalty: BigNumber
   ) {
-    const Reserve = await ethers.getContractFactory("Reserve", {
-      libraries: {
-        SafeDecimalMath: librarySafeDecimalMath.address,
-      },
-    });
-    reserve = (await upgrades.deployProxy(
-      Reserve,
-      [minCollateralRatio, liquidationPenalty],
-      { unsafeAllowLinkedLibraries: true }
-    )) as Reserve;
-
-    const Synth = await ethers.getContractFactory("Synth");
-    synth = (await upgrades.deployProxy(Synth, [
-      reserve.address,
-      oracle.address,
-      tokenName,
-      tokenSymbol,
-    ])) as Synth;
-
-    await reserve.grantRole(await reserve.DEFAULT_ADMIN_ROLE(), synth.address);
-    await reserve.grantRole(await reserve.MINTER_ROLE(), synth.address);
+    reserve = await deployReserve(
+      librarySafeDecimalMath,
+      minCollateralRatio,
+      liquidationPenalty
+    );
+    synth = await deploySynth(reserve, oracle, tokenName, tokenSymbol);
   };
 
   it("Mint burn Synth", async function () {
     await setUp(
-      ethers.utils.parseUnits("1.25", decimal),
-      ethers.utils.parseUnits("1.5", decimal)
+      ethers.utils.parseUnits("1.5", decimal),
+      ethers.utils.parseUnits("1.25", decimal)
     );
 
     const [owner, signer1, signer2] = await ethers.getSigners();
@@ -101,8 +87,8 @@ describe("#Synth", function () {
 
     beforeEach(async function () {
       await setUp(
-        ethers.utils.parseUnits("1.2", decimal),
-        ethers.utils.parseUnits("1.5", decimal)
+        ethers.utils.parseUnits("1.5", decimal),
+        ethers.utils.parseUnits("1.2", decimal)
       );
 
       const [owner, minter, liquidator] = await ethers.getSigners();
