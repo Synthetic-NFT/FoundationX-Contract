@@ -1,16 +1,22 @@
 import {
   Factory,
   IOracle,
-  MockOracle,
   Reserve,
   SafeDecimalMath,
   Vault,
 } from "../typechain";
 import { BigNumber } from "ethers";
-import { ethers, upgrades } from "hardhat";
+import { ethers } from "hardhat";
 import { describe, it } from "mocha";
 import { expect } from "chai";
-import { deployReserve, deploySynth, deployVault } from "./shared/constructor";
+import {
+  deployFactory,
+  deployMockOracle,
+  deployReserve,
+  deploySafeDecimalMath,
+  deploySynth,
+  deployVault,
+} from "./shared/constructor";
 
 describe("#Factory", function () {
   let librarySafeDecimalMath: SafeDecimalMath;
@@ -50,12 +56,10 @@ describe("#Factory", function () {
   beforeEach(async function () {
     const [owner, NFTContract] = await ethers.getSigners();
     ownerAddress = owner.address;
-    const Library = await ethers.getContractFactory("SafeDecimalMath");
-    librarySafeDecimalMath = await Library.deploy();
+    librarySafeDecimalMath = await deploySafeDecimalMath();
     decimal = await librarySafeDecimalMath.decimals();
     unit = await librarySafeDecimalMath.UNIT();
-    const MockOracle = await ethers.getContractFactory("MockOracle");
-    oracle = await MockOracle.deploy();
+    oracle = await deployMockOracle();
     [reserve1, vault1] = await setUpVault(
       ethers.utils.parseUnits("1.5", decimal),
       ethers.utils.parseUnits("1.2", decimal),
@@ -72,8 +76,7 @@ describe("#Factory", function () {
       NFTContract.address,
       BigNumber.from(0).mul(unit)
     );
-    const Factory = await ethers.getContractFactory("Factory");
-    factory = (await upgrades.deployProxy(Factory, [])) as Factory;
+    factory = await deployFactory();
     await factory.listVaults(
       [tokenName1, tokenName2],
       [vault1.address, vault2.address]

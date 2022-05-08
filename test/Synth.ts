@@ -5,7 +5,12 @@ import { beforeEach, describe, it } from "mocha";
 
 import { BigNumber } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { deployReserve, deploySynth } from "./shared/constructor";
+import {
+  deployMockOracle,
+  deployReserve,
+  deploySafeDecimalMath,
+  deploySynth,
+} from "./shared/constructor";
 
 describe("#Synth", function () {
   let librarySafeDecimalMath: SafeDecimalMath;
@@ -18,12 +23,10 @@ describe("#Synth", function () {
   const tokenSymbol = "$PUNK";
 
   beforeEach(async function () {
-    const Library = await ethers.getContractFactory("SafeDecimalMath");
-    librarySafeDecimalMath = await Library.deploy();
+    librarySafeDecimalMath = await deploySafeDecimalMath();
     decimal = await librarySafeDecimalMath.decimals();
     unit = await librarySafeDecimalMath.UNIT();
-    const MockOracle = await ethers.getContractFactory("MockOracle");
-    oracle = await MockOracle.deploy();
+    oracle = await deployMockOracle();
   });
 
   const setUp = async function (

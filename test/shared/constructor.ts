@@ -1,12 +1,27 @@
 import { BigNumber } from "ethers";
 import { ethers, upgrades } from "hardhat";
 import {
+  Factory,
   IOracle,
+  MockOracle,
   Reserve,
   SafeDecimalMath,
   Synth,
   Vault,
 } from "../../typechain";
+
+export async function deploySafeDecimalMath(): Promise<SafeDecimalMath> {
+  const SafeDecimalMath = await ethers.getContractFactory("SafeDecimalMath");
+  const safeDecimalMath = await SafeDecimalMath.deploy();
+  await safeDecimalMath.deployed();
+  return safeDecimalMath;
+}
+
+export async function deployMockOracle(): Promise<MockOracle> {
+  const MockOracle = await ethers.getContractFactory("MockOracle");
+  const oracle = await MockOracle.deploy();
+  return oracle;
+}
 
 export async function deployReserve(
   librarySafeDecimalMath: SafeDecimalMath,
@@ -64,4 +79,10 @@ export async function deployVault(
   await synth.grantRole(await synth.MINTER_ROLE(), vault.address);
 
   return vault;
+}
+
+export async function deployFactory(): Promise<Factory> {
+  const Factory = await ethers.getContractFactory("Factory");
+  const factory = (await upgrades.deployProxy(Factory, [])) as Factory;
+  return factory;
 }

@@ -12,7 +12,13 @@ import { BigNumber } from "ethers";
 import { getEthBalance } from "./shared/address";
 import { closeBigNumber } from "./shared/math";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { deployReserve, deploySynth, deployVault } from "./shared/constructor";
+import {
+  deployMockOracle,
+  deployReserve,
+  deploySafeDecimalMath,
+  deploySynth,
+  deployVault,
+} from "./shared/constructor";
 
 describe("#Vault", function () {
   let librarySafeDecimalMath: SafeDecimalMath;
@@ -26,12 +32,10 @@ describe("#Vault", function () {
   const tokenSymbol = "$PUNK";
 
   beforeEach(async function () {
-    const Library = await ethers.getContractFactory("SafeDecimalMath");
-    librarySafeDecimalMath = await Library.deploy();
+    librarySafeDecimalMath = await deploySafeDecimalMath();
     decimal = await librarySafeDecimalMath.decimals();
     unit = await librarySafeDecimalMath.UNIT();
-    const MockOracle = await ethers.getContractFactory("MockOracle");
-    oracle = await MockOracle.deploy();
+    oracle = await deployMockOracle();
   });
 
   const setUp = async function (

@@ -3,7 +3,7 @@ import { ethers, upgrades } from "hardhat";
 import { Reserve, SafeDecimalMath } from "../typechain";
 import { beforeEach, it } from "mocha";
 import { BigNumber } from "ethers";
-import { deployReserve } from "./shared/constructor";
+import { deployReserve, deploySafeDecimalMath } from "./shared/constructor";
 
 describe("#Reserve", function () {
   let librarySafeDecimalMath: SafeDecimalMath;
@@ -12,8 +12,7 @@ describe("#Reserve", function () {
   let decimal: number;
 
   beforeEach(async function () {
-    const Library = await ethers.getContractFactory("SafeDecimalMath");
-    librarySafeDecimalMath = await Library.deploy();
+    librarySafeDecimalMath = await deploySafeDecimalMath();
     decimal = await librarySafeDecimalMath.decimals();
     unit = await librarySafeDecimalMath.UNIT();
   });
