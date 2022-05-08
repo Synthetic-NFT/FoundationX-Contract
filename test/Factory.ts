@@ -3,6 +3,7 @@ import {
   IOracle,
   Reserve,
   SafeDecimalMath,
+  Synth,
   Vault,
 } from "../typechain";
 import { BigNumber } from "ethers";
@@ -30,6 +31,8 @@ describe("#Factory", function () {
   const tokenSymbol2 = "$BAYC";
   let reserve1: Reserve;
   let reserve2: Reserve;
+  let synth1: Synth;
+  let synth2: Synth;
   let vault1: Vault;
   let vault2: Vault;
   let factory: Factory;
@@ -41,7 +44,7 @@ describe("#Factory", function () {
     tokenSymbol: string,
     NFTAddress: string,
     lockingPeriod: BigNumber
-  ): Promise<[Reserve, Vault]> {
+  ): Promise<[Reserve, Synth, Vault]> {
     const reserve = await deployReserve(
       librarySafeDecimalMath,
       minCollateralRatio,
@@ -50,7 +53,7 @@ describe("#Factory", function () {
     const synth = await deploySynth(reserve, oracle, tokenName, tokenSymbol);
     const vault = await deployVault(synth, reserve, NFTAddress, lockingPeriod);
     await reserve.grantRole(await reserve.MINTER_ROLE(), ownerAddress);
-    return [reserve, vault];
+    return [reserve, synth, vault];
   };
 
   beforeEach(async function () {
@@ -60,7 +63,7 @@ describe("#Factory", function () {
     decimal = await librarySafeDecimalMath.decimals();
     unit = await librarySafeDecimalMath.UNIT();
     oracle = await deployMockOracle();
-    [reserve1, vault1] = await setUpVault(
+    [reserve1, synth1, vault1] = await setUpVault(
       ethers.utils.parseUnits("1.5", decimal),
       ethers.utils.parseUnits("1.2", decimal),
       tokenName1,
@@ -68,7 +71,7 @@ describe("#Factory", function () {
       NFTContract.address,
       BigNumber.from(0).mul(unit)
     );
-    [reserve2, vault2] = await setUpVault(
+    [reserve2, synth2, vault2] = await setUpVault(
       ethers.utils.parseUnits("1.5", decimal),
       ethers.utils.parseUnits("1.2", decimal),
       tokenName2,
@@ -99,6 +102,16 @@ describe("#Factory", function () {
     ).to.be.eql([
       [BigNumber.from(2).mul(unit), BigNumber.from(1).mul(unit)],
       [BigNumber.from(300).mul(unit), BigNumber.from(200).mul(unit)],
+    ]);
+  });
+
+  it("List token address info", async function () {
+    await factory.delistVaults([tokenName1]);
+    expect(await factory.listTokenAddressInfo()).to.be.eql([
+      [tokenName2],
+      [vault2.address],
+      [synth2.address],
+      [reserve2.address],
     ]);
   });
 });

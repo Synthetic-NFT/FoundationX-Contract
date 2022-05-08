@@ -96,7 +96,7 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
         address account,
         uint synthAmount,
         address liquidator
-    ) external returns (uint totalRedeemed, uint amountToLiquidate) {
+    ) public onlyRole(MINTER_ROLE) returns (uint totalRedeemed, uint amountToLiquidate) {
         // Check account is liquidation open
         uint synthPrice = getSynthPriceToEth();
         uint minterDebt = reserve.getMinterDebtETH(account);
@@ -111,12 +111,11 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
         uint liquidationPenalty = reserve.getLiquidationPenalty();
 
         // What is their debt in ETH?
-        uint debtBalance = synthPrice.multiplyDecimal(minterDebt);
         uint liquidateSynthEthValue = synthPrice.multiplyDecimal(synthAmount > minterDebt ? minterDebt : synthAmount);
 
         uint collateralForAccount = reserve.getMinterDepositETH(account);
 
-        uint amountToFixCollateralRatio = reserve.calculateAmountToFixCollateral(debtBalance, collateralForAccount);
+        uint amountToFixCollateralRatio = reserve.calculateAmountToFixCollateral(synthPrice.multiplyDecimal(minterDebt), collateralForAccount);
 
         // Cap amount to liquidate to repair collateral ratio based on issuance ratio
         amountToLiquidate = amountToFixCollateralRatio < liquidateSynthEthValue ? amountToFixCollateralRatio : liquidateSynthEthValue;
@@ -129,7 +128,7 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
         totalRedeemed = amountToLiquidate.multiplyDecimal(minterCollateralRatio < liquidationPenalty ? minterCollateralRatio : liquidationPenalty);
 
         // if total SNX to redeem is greater than account's collateral
-        // account is under collateralised, liquidate all collateral and reduce sUSD to burn
+        // account is under collateralized, liquidate all collateral and reduce sUSD to burn
         if (totalRedeemed > collateralForAccount) {
             // set totalRedeemed to all transferable collateral
             totalRedeemed = collateralForAccount;

@@ -19,8 +19,8 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable {
     using SafeDecimalMath for uint;
     using EnumerableSet for EnumerableSet.UintSet;
 
-    Synth synth;
-    Reserve reserve;
+    Synth public synth;
+    Reserve public reserve;
 
     address NFTAddress;
     EnumerableSet.UintSet holdings;
@@ -68,10 +68,6 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable {
     }
 
     function _authorizeUpgrade(address newImplementation) internal onlyRole(DEFAULT_ADMIN_ROLE) override {}
-
-    function getMutableReserve() external view returns (Reserve) {
-        return reserve;
-    }
 
     function checkTargetCollateralRatio(uint targetCollateralRatio) private {
         require(targetCollateralRatio >= reserve.getMinCollateralRatio(), ERR_INVALID_TARGET_COLLATERAL_RATIO);

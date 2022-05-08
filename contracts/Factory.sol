@@ -13,7 +13,8 @@ import "./libraries/SafeDecimalMath.sol";
 
 contract Factory is AccessControlUpgradeable, UUPSUpgradeable {
     mapping(string => Vault) vaults;
-    string[] listedTokens;
+    string[] public listedTokens;
+    uint8 public numListedTokens;
 
     string public constant ERR_SYNTH_NOT_AVAILABLE = "Synth not available";
 
@@ -36,6 +37,7 @@ contract Factory is AccessControlUpgradeable, UUPSUpgradeable {
             require(address(vaults[synthName]) == address(0));
             vaults[synthName] = _vaults[i];
             listedTokens.push(synthName);
+            numListedTokens += 1;
         }
     }
 
@@ -44,20 +46,39 @@ contract Factory is AccessControlUpgradeable, UUPSUpgradeable {
             string memory synthName = synthNames[i];
             require(address(vaults[synthName]) != address(0));
             delete vaults[synthName];
+            numListedTokens -= 1;
         }
     }
 
-    function listUserDebtDeposit(address account, string[] calldata tokens) public view returns (uint[] memory, uint[] memory) {
-        uint[] memory debts = new uint[](tokens.length);
-        uint[] memory deposits = new uint[](tokens.length);
+    function listUserDebtDeposit(address account, string[] calldata tokens) public view returns (uint[] memory debts, uint[] memory deposits) {
+        debts = new uint[](tokens.length);
+        deposits = new uint[](tokens.length);
         for (uint8 i = 0; i < tokens.length; i++) {
             string memory token = tokens[i];
             Vault vault = vaults[token];
             require(address(vault) != address(0), ERR_SYNTH_NOT_AVAILABLE);
-            Reserve reserve = vault.getMutableReserve();
+            Reserve reserve = vault.reserve();
             debts[i] = reserve.getMinterDebtETH(account);
             deposits[i] = reserve.getMinterDepositETH(account);
         }
         return (debts, deposits);
+    }
+
+    function listTokenAddressInfo() public view returns (string[] memory tokenNames, address[] memory vaultAddresses, address[] memory synthAddresses, address[] memory reserveAddresses) {
+        tokenNames = new string[](numListedTokens);
+        vaultAddresses = new address[](numListedTokens);
+        synthAddresses = new address[](numListedTokens);
+        reserveAddresses = new address[](numListedTokens);
+        uint result_i = 0;
+        for (uint8 i = 0; i < listedTokens.length; i++) {
+            string memory tokenName = listedTokens[i];
+            Vault vault = vaults[tokenName];
+            if (address(vault) != address(0)) {
+                tokenNames[result_i] = tokenName;
+                vaultAddresses[result_i] = address(vault);
+                synthAddresses[result_i] = address(vault.synth());
+                reserveAddresses[result_i] = address(vault.reserve());
+            }
+        }
     }
 }
