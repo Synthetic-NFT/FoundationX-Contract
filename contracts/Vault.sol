@@ -19,6 +19,8 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable {
     Synth synth;
     Reserve reserve;
 
+    mapping(uint => address) NFTDepositer;
+
     string public constant ERR_USER_UNDER_COLLATERALIZED = "User under collateralized";
     string public constant ERR_NOT_ENOUGH_SYNTH_TO_MINT = "Not enough mintable synth";
     string public constant ERR_BURNING_EXCEED_DEBT = "Burning amount exceeds user debt";
@@ -67,21 +69,21 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable {
         require(targetCollateralRatio >= reserve.getMinCollateralRatio(), ERR_INVALID_TARGET_COLLATERAL_RATIO);
     }
 
-    function userMintSynth(uint targetCollateralRatio) external payable lock {
+    function userMintSynthETH(uint targetCollateralRatio) external payable lock {
         checkTargetCollateralRatio(targetCollateralRatio);
         reserve.addMinterDepositETH(msg.sender, msg.value);
         synth.mintSynth(msg.sender, msg.value.divideDecimal(targetCollateralRatio.multiplyDecimal(synth.getSynthPriceToEth())));
     }
 
-    function userBurnSynth() external payable lock {
-        internalUserManageSynth(reserve.getMinCollateralRatio(), 0);
+    function userBurnSynthETH() external payable lock {
+        internalUserManageSynthETH(reserve.getMinCollateralRatio(), 0);
     }
 
-    function userManageSynth(uint targetCollateralRatio, uint targetDeposit) external payable lock {
-        internalUserManageSynth(targetCollateralRatio, targetDeposit);
+    function userManageSynthETH(uint targetCollateralRatio, uint targetDeposit) external payable lock {
+        internalUserManageSynthETH(targetCollateralRatio, targetDeposit);
     }
 
-    function internalUserManageSynth(uint targetCollateralRatio, uint targetDeposit) private {
+    function internalUserManageSynthETH(uint targetCollateralRatio, uint targetDeposit) private {
         checkTargetCollateralRatio(targetCollateralRatio);
 
         if (msg.value > 0) {
@@ -104,7 +106,7 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable {
         }
     }
 
-    function userLiquidate(address account, uint synthAmount) external payable lock returns (bool) {
+    function userLiquidateETH(address account, uint synthAmount) external payable lock returns (bool) {
         (uint totalRedeemed, uint amountToLiquidate) = synth.liquidateDelinquentAccount(account, synthAmount, msg.sender);
         payable(msg.sender).transfer(totalRedeemed);
         return true;

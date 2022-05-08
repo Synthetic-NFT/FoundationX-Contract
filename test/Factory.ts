@@ -98,13 +98,13 @@ describe("#Factory", function () {
   });
 
   it("List debts deposits", async function () {
-    await reserve1.addMinterDebt(ownerAddress, BigNumber.from(1).mul(unit));
-    await reserve1.addMinterDeposit(
+    await reserve1.addMinterDebtETH(ownerAddress, BigNumber.from(1).mul(unit));
+    await reserve1.addMinterDepositETH(
       ownerAddress,
       BigNumber.from(200).mul(unit)
     );
-    await reserve2.addMinterDebt(ownerAddress, BigNumber.from(2).mul(unit));
-    await reserve2.addMinterDeposit(
+    await reserve2.addMinterDebtETH(ownerAddress, BigNumber.from(2).mul(unit));
+    await reserve2.addMinterDepositETH(
       ownerAddress,
       BigNumber.from(300).mul(unit)
     );

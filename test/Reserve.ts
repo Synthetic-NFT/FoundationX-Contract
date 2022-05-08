@@ -41,8 +41,8 @@ describe("#Reserve", function () {
     const [_, signer] = await ethers.getSigners();
     const signerAddress = signer.address;
     await Promise.all([
-      reserve.addMinterDeposit(signerAddress, BigNumber.from(130).mul(unit)),
-      reserve.addMinterDebt(signerAddress, BigNumber.from(1).mul(unit)),
+      reserve.addMinterDepositETH(signerAddress, BigNumber.from(130).mul(unit)),
+      reserve.addMinterDebtETH(signerAddress, BigNumber.from(1).mul(unit)),
     ]);
     expect(
       await reserve.getMinterCollateralRatio(
@@ -60,7 +60,7 @@ describe("#Reserve", function () {
 
     const [_, signer] = await ethers.getSigners();
     const signerAddress = signer.address;
-    await reserve.addMinterDebt(signerAddress, BigNumber.from(1).mul(unit));
+    await reserve.addMinterDebtETH(signerAddress, BigNumber.from(1).mul(unit));
     expect(await reserve.isOpenForLiquidation(signerAddress)).to.equal(false);
     await reserve.flagAccountForLiquidation(signerAddress);
     expect(await reserve.isOpenForLiquidation(signerAddress)).to.equal(true);
@@ -87,8 +87,8 @@ describe("#Reserve", function () {
       openForLiquidation: boolean
     ) {
       await Promise.all([
-        reserve.addMinterDeposit(signerAddress, deposit),
-        reserve.addMinterDebt(signerAddress, debt),
+        reserve.addMinterDepositETH(signerAddress, deposit),
+        reserve.addMinterDebtETH(signerAddress, debt),
       ]);
       await reserve.flagAccountForLiquidation(signerAddress);
       await reserve.checkAndRemoveAccountInLiquidation(

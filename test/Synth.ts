@@ -64,7 +64,7 @@ describe("#Synth", function () {
     await synth.mintSynth(signer2.address, BigNumber.from(20).mul(unit));
 
     const assertBalance = async function (address: string, balance: BigNumber) {
-      expect(await reserve.getMinterDebt(address)).to.equal(balance);
+      expect(await reserve.getMinterDebtETH(address)).to.equal(balance);
       expect(await synth.balanceOf(address)).to.equal(balance);
     };
 
@@ -118,8 +118,8 @@ describe("#Synth", function () {
       assetPrice: BigNumber
     ) {
       await Promise.all([
-        reserve.addMinterDebt(minterAddress, debt),
-        reserve.addMinterDeposit(minterAddress, deposit),
+        reserve.addMinterDebtETH(minterAddress, debt),
+        reserve.addMinterDepositETH(minterAddress, deposit),
         oracle.setAssetPrice(tokenName, assetPrice),
       ]);
     };
@@ -178,10 +178,10 @@ describe("#Synth", function () {
         BigNumber.from(3).mul(unit),
         liquidatorAddress
       );
-      expect(await reserve.getMinterDebt(minterAddress)).to.equal(
+      expect(await reserve.getMinterDebtETH(minterAddress)).to.equal(
         BigNumber.from(7).mul(unit)
       );
-      expect(await reserve.getMinterDeposit(minterAddress)).to.equal(
+      expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
         BigNumber.from(1040).mul(unit)
       );
       expect(await reserve.isOpenForLiquidation(minterAddress)).to.equal(true);
@@ -215,10 +215,10 @@ describe("#Synth", function () {
         BigNumber.from(11).mul(unit),
         liquidatorAddress
       );
-      expect(await reserve.getMinterDebt(minterAddress)).to.equal(
+      expect(await reserve.getMinterDebtETH(minterAddress)).to.equal(
         BigNumber.from(10).mul(unit)
       );
-      expect(await reserve.getMinterDeposit(minterAddress)).to.equal(
+      expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
         BigNumber.from(1500).mul(unit)
       );
       expect(await reserve.isOpenForLiquidation(minterAddress)).to.equal(false);
@@ -252,10 +252,10 @@ describe("#Synth", function () {
         BigNumber.from(11).mul(unit),
         liquidatorAddress
       );
-      expect(await reserve.getMinterDebt(minterAddress)).to.equal(
+      expect(await reserve.getMinterDebtETH(minterAddress)).to.equal(
         BigNumber.from(0).mul(unit)
       );
-      expect(await reserve.getMinterDeposit(minterAddress)).to.equal(
+      expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
         BigNumber.from(0).mul(unit)
       );
       expect(await reserve.isOpenForLiquidation(minterAddress)).to.equal(false);

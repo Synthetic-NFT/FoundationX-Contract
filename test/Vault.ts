@@ -99,7 +99,7 @@ describe("#Vault", function () {
       await expect(
         vault
           .connect(minter)
-          .userMintSynth(ethers.utils.parseUnits("1.4", decimal), {
+          .userMintSynthETH(ethers.utils.parseUnits("1.4", decimal), {
             value: BigNumber.from(200).mul(unit),
           })
       ).to.be.revertedWith(await vault.ERR_INVALID_TARGET_COLLATERAL_RATIO());
@@ -114,11 +114,13 @@ describe("#Vault", function () {
       ) {
         await vault
           .connect(minter)
-          .userMintSynth(collateralRatio, { value: mintDeposit });
+          .userMintSynthETH(collateralRatio, { value: mintDeposit });
         expect(await getEthBalance(vault.address)).to.equal(postDeposit);
         expect(await synth.balanceOf(minterAddress)).to.equal(postDebt);
-        expect(await reserve.getMinterDebt(minterAddress)).to.equal(postDebt);
-        expect(await reserve.getMinterDeposit(minterAddress)).to.equal(
+        expect(await reserve.getMinterDebtETH(minterAddress)).to.equal(
+          postDebt
+        );
+        expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
           postDeposit
         );
       };
@@ -151,13 +153,13 @@ describe("#Vault", function () {
     ]);
     await vault
       .connect(minter)
-      .userMintSynth(ethers.utils.parseUnits("1.6", decimal), {
+      .userMintSynthETH(ethers.utils.parseUnits("1.6", decimal), {
         value: BigNumber.from(320).mul(unit),
       });
     await synth
       .connect(minter)
       .approve(vault.address, BigNumber.from(20).mul(unit));
-    await vault.connect(minter).userBurnSynth();
+    await vault.connect(minter).userBurnSynthETH();
 
     expect(await getEthBalance(vault.address)).to.equal(
       BigNumber.from(0).mul(unit)
@@ -165,10 +167,10 @@ describe("#Vault", function () {
     expect(await synth.balanceOf(minterAddress)).to.equal(
       BigNumber.from(0).mul(unit)
     );
-    expect(await reserve.getMinterDebt(minterAddress)).to.equal(
+    expect(await reserve.getMinterDebtETH(minterAddress)).to.equal(
       BigNumber.from(0).mul(unit)
     );
-    expect(await reserve.getMinterDeposit(minterAddress)).to.equal(
+    expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
       BigNumber.from(0).mul(unit)
     );
     const minterEthBalance = await getEthBalance(minterAddress);
@@ -206,8 +208,10 @@ describe("#Vault", function () {
     ) {
       expect(await getEthBalance(vault.address)).to.equal(vaultBalance);
       expect(await synth.balanceOf(minterAddress)).to.equal(minterDebt);
-      expect(await reserve.getMinterDebt(minterAddress)).to.equal(minterDebt);
-      expect(await reserve.getMinterDeposit(minterAddress)).to.equal(
+      expect(await reserve.getMinterDebtETH(minterAddress)).to.equal(
+        minterDebt
+      );
+      expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
         minterDeposit
       );
       expect(
@@ -222,12 +226,12 @@ describe("#Vault", function () {
     it("Add deposit add debt", async function () {
       await vault
         .connect(minter)
-        .userMintSynth(ethers.utils.parseUnits("1.6", decimal), {
+        .userMintSynthETH(ethers.utils.parseUnits("1.6", decimal), {
           value: BigNumber.from(160).mul(unit),
         });
       await vault
         .connect(minter)
-        .userManageSynth(
+        .userManageSynthETH(
           ethers.utils.parseUnits("1.7", decimal),
           BigNumber.from(340).mul(unit),
           { value: BigNumber.from(180).mul(unit) }
@@ -246,7 +250,7 @@ describe("#Vault", function () {
     it("Add deposit reduce debt", async function () {
       await vault
         .connect(minter)
-        .userMintSynth(ethers.utils.parseUnits("1.6", decimal), {
+        .userMintSynthETH(ethers.utils.parseUnits("1.6", decimal), {
           value: BigNumber.from(160).mul(unit),
         });
       await synth
@@ -254,7 +258,7 @@ describe("#Vault", function () {
         .approve(vault.address, BigNumber.from(1).mul(unit));
       await vault
         .connect(minter)
-        .userManageSynth(
+        .userManageSynthETH(
           ethers.utils.parseUnits("2.0", decimal),
           BigNumber.from(180).mul(unit),
           { value: BigNumber.from(20).mul(unit) }
@@ -273,12 +277,12 @@ describe("#Vault", function () {
     it("Reduce deposit add debt", async function () {
       await vault
         .connect(minter)
-        .userMintSynth(ethers.utils.parseUnits("2.0", decimal), {
+        .userMintSynthETH(ethers.utils.parseUnits("2.0", decimal), {
           value: BigNumber.from(180).mul(unit),
         });
       await vault
         .connect(minter)
-        .userManageSynth(
+        .userManageSynthETH(
           ethers.utils.parseUnits("1.6", decimal),
           BigNumber.from(160).mul(unit)
         );
@@ -296,7 +300,7 @@ describe("#Vault", function () {
     it("Reduce deposit reduce debt", async function () {
       await vault
         .connect(minter)
-        .userMintSynth(ethers.utils.parseUnits("2.0", decimal), {
+        .userMintSynthETH(ethers.utils.parseUnits("2.0", decimal), {
           value: BigNumber.from(240).mul(unit),
         });
       await synth
@@ -304,7 +308,7 @@ describe("#Vault", function () {
         .approve(vault.address, BigNumber.from(2).mul(unit));
       await vault
         .connect(minter)
-        .userManageSynth(
+        .userManageSynthETH(
           ethers.utils.parseUnits("1.6", decimal),
           BigNumber.from(160).mul(unit)
         );
@@ -339,7 +343,7 @@ describe("#Vault", function () {
 
     await vault
       .connect(minter)
-      .userMintSynth(ethers.utils.parseUnits("2.25", decimal), {
+      .userMintSynthETH(ethers.utils.parseUnits("2.25", decimal), {
         value: BigNumber.from(2700).mul(unit),
       });
     await Promise.all([
@@ -352,7 +356,7 @@ describe("#Vault", function () {
 
     await vault
       .connect(liquidator)
-      .userLiquidate(minterAddress, BigNumber.from(11).mul(unit));
+      .userLiquidateETH(minterAddress, BigNumber.from(11).mul(unit));
 
     expect(await synth.balanceOf(liquidatorAddress)).to.equal(
       BigNumber.from(2).mul(unit)
@@ -360,7 +364,7 @@ describe("#Vault", function () {
     expect(await synth.balanceOf(minterAddress)).to.equal(
       BigNumber.from(20).mul(unit)
     );
-    const minterDeposit = await reserve.getMinterDebt(minterAddress);
+    const minterDeposit = await reserve.getMinterDebtETH(minterAddress);
     expect(
       closeBigNumber(
         minterDeposit,
@@ -368,7 +372,7 @@ describe("#Vault", function () {
         BigNumber.from(1).mul(unit.sub(4))
       )
     );
-    expect(await reserve.getMinterDebt(minterAddress)).to.equal(
+    expect(await reserve.getMinterDebtETH(minterAddress)).to.equal(
       BigNumber.from(10).mul(unit)
     );
     expect(await getEthBalance(vault.address)).to.equal(
