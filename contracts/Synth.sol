@@ -76,20 +76,21 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
         synthPrice = oracle.getAssetPrice(tokenName);
     }
 
-    function mintSynth(address minter, uint amount) public onlyRole(MINTER_ROLE) {
+    function mintTo(address minter, uint amount) public onlyRole(MINTER_ROLE) {
+        _mint(minter, amount);
+    }
+
+    function mintToWithETH(address minter, uint amount) public onlyRole(MINTER_ROLE) {
         _mint(minter, amount);
         reserve.addMinterDebtETH(minter, amount);
     }
 
-    function burnSynth(address debtAccount, address burnAccount, uint amount) public onlyRole(MINTER_ROLE) {
-        uint existingDebt = reserve.getMinterDebtETH(debtAccount);
-        uint amountBurnt = existingDebt < amount ? existingDebt : amount;
-
+    function burnFromWithETH(address debtAccount, address burnAccount, uint amount) public onlyRole(MINTER_ROLE) {
         // synth.burn does a safe subtraction on balance (so it will revert if there are not enough synths).
-        burnFrom(burnAccount, amountBurnt);
+        burnFrom(burnAccount, amount);
 
         // Account for the burnt debt in the cache.
-        reserve.reduceMinterDebtETH(debtAccount, amountBurnt);
+        reserve.reduceMinterDebtETH(debtAccount, amount);
     }
 
     function liquidateDelinquentAccount(
@@ -138,7 +139,7 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
         }
 
         // burn sUSD from messageSender (liquidator) and reduce account's debt
-        burnSynth(account, liquidator, synthLiquidated);
+        burnFromWithETH(account, liquidator, synthLiquidated);
         reserve.reduceMinterDepositETH(account, totalRedeemed);
         // Remove liquidation flag if amount liquidated fixes ratio
         if (amountToLiquidate >= amountToFixCollateralRatio || synthLiquidated >= minterDebt) {

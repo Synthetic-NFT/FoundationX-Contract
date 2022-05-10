@@ -38,6 +38,7 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable, ERC721HolderUpgrade
     string public constant ERR_NFT_ALREADY_IN_HOLDINGS = "NFT already in holdings";
     string public constant ERR_NFT_NOT_IN_HOLDINGS = "NFT not in holdings";
     string public constant ERR_NOT_NFT_OWNER = "Not the NFT owner";
+    string public constant ERR_WITHIN_LOCKING_PERIOD = "Within locking period";
 
     bool locked;
 
@@ -78,7 +79,7 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable, ERC721HolderUpgrade
     function userMintSynthETH(uint targetCollateralRatio) external payable lock {
         checkTargetCollateralRatio(targetCollateralRatio);
         reserve.addMinterDepositETH(msg.sender, msg.value);
-        synth.mintSynth(msg.sender, msg.value.divideDecimal(targetCollateralRatio.multiplyDecimal(synth.getSynthPriceToEth())));
+        synth.mintToWithETH(msg.sender, msg.value.divideDecimal(targetCollateralRatio.multiplyDecimal(synth.getSynthPriceToEth())));
     }
 
     function userBurnSynthETH() external payable lock {
@@ -100,9 +101,9 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable, ERC721HolderUpgrade
         uint originalDebt = reserve.getMinterDebtETH(msg.sender);
         uint targetDebt = targetDeposit.divideDecimal(targetCollateralRatio).divideDecimal(synth.getSynthPriceToEth());
         if (originalDebt > targetDebt) {
-            synth.burnSynth(msg.sender, msg.sender, originalDebt.sub(targetDebt));
+            synth.burnFromWithETH(msg.sender, msg.sender, originalDebt.sub(targetDebt));
         } else if (originalDebt < targetDebt) {
-            synth.mintSynth(msg.sender, targetDebt - originalDebt);
+            synth.mintToWithETH(msg.sender, targetDebt - originalDebt);
         }
 
         uint originalDeposit = reserve.getMinterDepositETH(msg.sender);
@@ -172,7 +173,7 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable, ERC721HolderUpgrade
             NFTDepositer[tokenId] = msg.sender;
             NFTDepositTimes[tokenId] = block.timestamp;
         }
-        synth.mintSynth(msg.sender, tokenIds.length.mul(SafeDecimalMath.unit()));
+        synth.mintTo(msg.sender, tokenIds.length.mul(SafeDecimalMath.unit()));
     }
 
     function userBurnSynthNFT(uint[] calldata tokenIds) external lock {
@@ -181,13 +182,12 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable, ERC721HolderUpgrade
             require(holdings.contains(tokenId), ERR_NFT_NOT_IN_HOLDINGS);
             holdings.remove(tokenId);
             address depositer = NFTDepositer[tokenId];
-            if (depositer == msg.sender || block.timestamp > (NFTDepositTimes[tokenId].add(lockingPeriod))) {
-                transferERC721(NFTAddress, msg.sender, tokenId);
-                reserve.reduceMinterDepositNFT(depositer, tokenId);
-                delete NFTDepositer[tokenId];
-                delete NFTDepositTimes[tokenId];
-            }
+            require(depositer == msg.sender || block.timestamp > (NFTDepositTimes[tokenId].add(lockingPeriod)), ERR_WITHIN_LOCKING_PERIOD);
+            transferERC721(NFTAddress, msg.sender, tokenId);
+            reserve.reduceMinterDepositNFT(depositer, tokenId);
+            delete NFTDepositer[tokenId];
+            delete NFTDepositTimes[tokenId];
         }
-        synth.burnSynth(msg.sender, msg.sender, tokenIds.length.mul(SafeDecimalMath.unit()));
+        synth.burnFrom(msg.sender, tokenIds.length.mul(SafeDecimalMath.unit()));
     }
 }
