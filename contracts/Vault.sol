@@ -8,12 +8,13 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/IERC721Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/utils/ERC721HolderUpgradeable.sol";
 import "./libraries/SafeDecimalMath.sol";
 import "hardhat/console.sol";
 import "./Greeter.sol";
 
 
-contract Vault is AccessControlUpgradeable, UUPSUpgradeable {
+contract Vault is AccessControlUpgradeable, UUPSUpgradeable, ERC721HolderUpgradeable {
 
     using SafeMath for uint;
     using SafeDecimalMath for uint;
@@ -22,12 +23,12 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable {
     Synth public synth;
     Reserve public reserve;
 
-    address NFTAddress;
+    address public NFTAddress;
     EnumerableSet.UintSet holdings;
-    mapping(uint => address) NFTDepositer;
-    mapping(uint => uint) NFTDepositTimes;
+    mapping(uint => address) public NFTDepositer;
+    mapping(uint => uint) public NFTDepositTimes;
 
-    uint lockingPeriod;
+    uint public lockingPeriod;
 
     string public constant ERR_USER_UNDER_COLLATERALIZED = "User under collateralized";
     string public constant ERR_NOT_ENOUGH_SYNTH_TO_MINT = "Not enough mintable synth";
@@ -36,6 +37,7 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable {
     string public constant ERR_INVALID_TARGET_COLLATERAL_RATIO = "Invalid target collateral ratio";
     string public constant ERR_NFT_ALREADY_IN_HOLDINGS = "NFT already in holdings";
     string public constant ERR_NFT_NOT_IN_HOLDINGS = "NFT not in holdings";
+    string public constant ERR_NOT_NFT_OWNER = "Not the NFT owner";
 
     bool locked;
 
@@ -147,13 +149,13 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable {
             bytes memory punkIndexToAddress = abi.encodeWithSignature("punkIndexToAddress(uint256)", tokenId);
             (bool checkSuccess, bytes memory result) = address(assetAddr).staticcall(punkIndexToAddress);
             (address nftOwner) = abi.decode(result, (address));
-            require(checkSuccess && nftOwner == msg.sender, "Not the NFT owner");
+            require(checkSuccess && nftOwner == msg.sender, ERR_NOT_NFT_OWNER);
             data = abi.encodeWithSignature("buyPunk(uint256)", tokenId);
         } else {
             // Default.
             // Allow other contracts to "push" into the vault, safely.
             // If we already have the token requested, make sure we don't have it in the list to prevent duplicate minting.
-            require(IERC721Upgradeable(assetAddr).ownerOf(tokenId) != address(this), "Trying to use an owned NFT");
+            require(IERC721Upgradeable(assetAddr).ownerOf(tokenId) == msg.sender, ERR_NOT_NFT_OWNER);
             data = abi.encodeWithSignature("safeTransferFrom(address,address,uint256)", msg.sender, address(this), tokenId);
         }
         (bool success, bytes memory resultData) = address(assetAddr).call(data);
@@ -170,6 +172,7 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable {
             NFTDepositer[tokenId] = msg.sender;
             NFTDepositTimes[tokenId] = block.timestamp;
         }
+        synth.mintSynth(msg.sender, tokenIds.length.mul(SafeDecimalMath.unit()));
     }
 
     function userBurnSynthNFT(uint[] calldata tokenIds) external lock {
@@ -185,5 +188,6 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable {
                 delete NFTDepositTimes[tokenId];
             }
         }
+        synth.burnSynth(msg.sender, msg.sender, tokenIds.length.mul(SafeDecimalMath.unit()));
     }
 }

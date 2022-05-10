@@ -51,7 +51,13 @@ describe("#Factory", function () {
       liquidationPenalty
     );
     const synth = await deploySynth(reserve, oracle, tokenName, tokenSymbol);
-    const vault = await deployVault(synth, reserve, NFTAddress, lockingPeriod);
+    const vault = await deployVault(
+      librarySafeDecimalMath,
+      synth,
+      reserve,
+      NFTAddress,
+      lockingPeriod
+    );
     await reserve.grantRole(await reserve.MINTER_ROLE(), ownerAddress);
     return [reserve, synth, vault];
   };

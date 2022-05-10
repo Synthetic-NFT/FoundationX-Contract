@@ -56,6 +56,7 @@ async function main() {
   console.log("Synth deployed to:", synth.address);
 
   const vault = await deployVault(
+    safeDecimalMath,
     synth,
     reserve,
     boredApeAddress,

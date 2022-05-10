@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
 import {
+  MockNFT,
   MockOracle,
   Reserve,
   SafeDecimalMath,
@@ -13,6 +14,7 @@ import { getEthBalance } from "./shared/address";
 import { closeBigNumber } from "./shared/math";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import {
+  deployMockNFT,
   deployMockOracle,
   deployReserve,
   deploySafeDecimalMath,
@@ -25,11 +27,14 @@ describe("#Vault", function () {
   let reserve: Reserve;
   let oracle: MockOracle;
   let synth: Synth;
+  let NFT: MockNFT;
   let vault: Vault;
   let decimal: number;
   let unit: BigNumber;
   const tokenName = "CryptoPunks";
   const tokenSymbol = "$PUNK";
+  const NFTName = "CryptoPunks_NFT";
+  const NFTSymbol = "$PUNK_NFT";
 
   beforeEach(async function () {
     librarySafeDecimalMath = await deploySafeDecimalMath();
@@ -41,7 +46,6 @@ describe("#Vault", function () {
   const setUp = async function (
     minCollateralRatio: BigNumber,
     liquidationPenalty: BigNumber,
-    NFTAddress: string,
     lockingPeriod: BigNumber
   ) {
     reserve = await deployReserve(
@@ -50,7 +54,14 @@ describe("#Vault", function () {
       liquidationPenalty
     );
     synth = await deploySynth(reserve, oracle, tokenName, tokenSymbol);
-    vault = await deployVault(synth, reserve, NFTAddress, lockingPeriod);
+    NFT = await deployMockNFT(NFTName, NFTSymbol);
+    vault = await deployVault(
+      librarySafeDecimalMath,
+      synth,
+      reserve,
+      NFT.address,
+      lockingPeriod
+    );
   };
 
   const setUpUserAccount = async function (
@@ -63,18 +74,17 @@ describe("#Vault", function () {
     ]);
   };
 
-  describe("User mint synth", async function () {
+  describe("User mint synth ETH", async function () {
     let minter: SignerWithAddress;
     let minterAddress: string;
 
     beforeEach(async function () {
       const liquidationPenalty = ethers.utils.parseUnits("1.2", decimal);
       const minCollateralRatio = ethers.utils.parseUnits("1.5", decimal);
-      const [_, minterSigner, NFTContract] = await ethers.getSigners();
+      const [_, minterSigner] = await ethers.getSigners();
       await setUp(
         minCollateralRatio,
         liquidationPenalty,
-        NFTContract.address,
         BigNumber.from(0).mul(unit)
       );
       minter = minterSigner;
@@ -130,14 +140,13 @@ describe("#Vault", function () {
     });
   });
 
-  it("User burn synth", async function () {
+  it("User burn synth ETH", async function () {
     const liquidationPenalty = ethers.utils.parseUnits("1.2", decimal);
     const minCollateralRatio = ethers.utils.parseUnits("1.5", decimal);
-    const [_, minter, NFTContract] = await ethers.getSigners();
+    const [_, minter] = await ethers.getSigners();
     await setUp(
       minCollateralRatio,
       liquidationPenalty,
-      NFTContract.address,
       BigNumber.from(0).mul(unit)
     );
     const minterAddress = minter.address;
@@ -178,18 +187,17 @@ describe("#Vault", function () {
     ).to.true;
   });
 
-  describe("User manage synth", async function () {
+  describe("User manage synth ETH", async function () {
     let minter: SignerWithAddress;
     let minterAddress: string;
 
     beforeEach(async function () {
       const liquidationPenalty = ethers.utils.parseUnits("1.2", decimal);
       const minCollateralRatio = ethers.utils.parseUnits("1.5", decimal);
-      const [_, minterSigner, NFTContract] = await ethers.getSigners();
+      const [_, minterSigner] = await ethers.getSigners();
       await setUp(
         minCollateralRatio,
         liquidationPenalty,
-        NFTContract.address,
         BigNumber.from(0).mul(unit)
       );
       minter = minterSigner;
@@ -324,14 +332,13 @@ describe("#Vault", function () {
     });
   });
 
-  it("User liquidate", async function () {
+  it("User liquidate ETH", async function () {
     const liquidationPenalty = ethers.utils.parseUnits("1.2", decimal);
     const minCollateralRatio = ethers.utils.parseUnits("1.5", decimal);
-    const [_, minter, liquidator, NFTContract] = await ethers.getSigners();
+    const [_, minter, liquidator] = await ethers.getSigners();
     await setUp(
       minCollateralRatio,
       liquidationPenalty,
-      NFTContract.address,
       BigNumber.from(0).mul(unit)
     );
     const minterAddress = minter.address;
@@ -392,4 +399,62 @@ describe("#Vault", function () {
       )
     );
   });
+
+  describe("User mint synth NFT", async function () {
+    let minter: SignerWithAddress;
+    let minterAddress: string;
+
+    beforeEach(async function () {
+      await setUp(
+        ethers.utils.parseUnits("1.5", decimal),
+        ethers.utils.parseUnits("1.2", decimal),
+        BigNumber.from(0).mul(unit)
+      );
+      const [_, minterSigner] = await ethers.getSigners();
+      minter = minterSigner;
+      minterAddress = minter.address;
+      await NFT.mint(minterAddress, BigNumber.from(0));
+      await NFT.mint(minterAddress, BigNumber.from(1));
+    });
+
+    it("Not NFT owner", async function () {
+      await NFT.mint(vault.address, BigNumber.from(2));
+      await expect(
+        vault.connect(minter).userMintSynthNFT([BigNumber.from(2)])
+      ).to.be.revertedWith(await vault.ERR_NOT_NFT_OWNER());
+    });
+
+    it("NFT in holdings", async function () {
+      const depositedNFTs = [BigNumber.from(0), BigNumber.from(1)];
+      for (const depositedNFT of depositedNFTs) {
+        await NFT.connect(minter).approve(vault.address, depositedNFT);
+      }
+
+      await vault.connect(minter).userMintSynthNFT(depositedNFTs);
+      for (const depositedNFT of depositedNFTs) {
+        expect(await NFT.ownerOf(depositedNFT)).to.be.equal(vault.address);
+        expect(await vault.NFTDepositer(depositedNFT)).to.be.equal(
+          minterAddress
+        );
+      }
+      expect(await synth.totalSupply()).to.be.equal(
+        BigNumber.from(depositedNFTs.length).mul(unit)
+      );
+      expect(await synth.balanceOf(minterAddress)).to.be.equal(
+        BigNumber.from(depositedNFTs.length).mul(unit)
+      );
+      expect(await reserve.getMinterDebtNFT(minterAddress)).to.be.eql(
+        BigNumber.from(depositedNFTs.length).mul(unit)
+      );
+      expect(await reserve.getMinterDepositNFT(minterAddress)).to.be.eql(
+        depositedNFTs
+      );
+
+      await expect(
+        vault.connect(minter).userMintSynthNFT([BigNumber.from(1)])
+      ).to.be.revertedWith(await vault.ERR_NFT_ALREADY_IN_HOLDINGS());
+    });
+  });
+
+  describe("User burn synth NFT", async function () {});
 });

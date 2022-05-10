@@ -84,7 +84,7 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
 
     function getMinterDebtNFT(address minter) public view returns (uint) {
         EnumerableSet.UintSet storage minterHoldings = minterDepositBalanceNFT[minter];
-        return minterHoldings.length();
+        return minterHoldings.length().mul(SafeDecimalMath.unit());
     }
 
     function getMinterDebt(address minter) public view returns (uint) {

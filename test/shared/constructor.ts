@@ -3,6 +3,7 @@ import { ethers, upgrades } from "hardhat";
 import {
   Factory,
   IOracle,
+  MockNFT,
   MockOracle,
   Reserve,
   SafeDecimalMath,
@@ -61,19 +62,34 @@ export async function deploySynth(
   return synth;
 }
 
+export async function deployMockNFT(
+  tokenName: string,
+  tokenSymbol: string
+): Promise<MockNFT> {
+  const MockNFT = await ethers.getContractFactory("MockNFT");
+  return (await upgrades.deployProxy(MockNFT, [
+    tokenName,
+    tokenSymbol,
+  ])) as MockNFT;
+}
+
 export async function deployVault(
+  librarySafeDecimalMath: SafeDecimalMath,
   synth: Synth,
   reserve: Reserve,
   NFTAddress: string,
   lockingPeriod: BigNumber
 ): Promise<Vault> {
-  const Vault = await ethers.getContractFactory("Vault");
-  const vault = (await upgrades.deployProxy(Vault, [
-    synth.address,
-    reserve.address,
-    NFTAddress,
-    lockingPeriod,
-  ])) as Vault;
+  const Vault = await ethers.getContractFactory("Vault", {
+    libraries: {
+      SafeDecimalMath: librarySafeDecimalMath.address,
+    },
+  });
+  const vault = (await upgrades.deployProxy(
+    Vault,
+    [synth.address, reserve.address, NFTAddress, lockingPeriod],
+    { unsafeAllowLinkedLibraries: true }
+  )) as Vault;
 
   await reserve.grantRole(await reserve.MINTER_ROLE(), vault.address);
   await synth.grantRole(await synth.MINTER_ROLE(), vault.address);
@@ -83,6 +99,5 @@ export async function deployVault(
 
 export async function deployFactory(): Promise<Factory> {
   const Factory = await ethers.getContractFactory("Factory");
-  const factory = (await upgrades.deployProxy(Factory, [])) as Factory;
-  return factory;
+  return (await upgrades.deployProxy(Factory, [])) as Factory;
 }
