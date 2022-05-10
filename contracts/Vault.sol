@@ -38,6 +38,7 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable, ERC721HolderUpgrade
     string public constant ERR_NFT_ALREADY_IN_HOLDINGS = "NFT already in holdings";
     string public constant ERR_NFT_NOT_IN_HOLDINGS = "NFT not in holdings";
     string public constant ERR_NOT_NFT_OWNER = "Not the NFT owner";
+    string public constant ERR_WITHIN_LOCKING_PERIOD = "Within locking period";
 
     bool locked;
 
@@ -181,12 +182,11 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable, ERC721HolderUpgrade
             require(holdings.contains(tokenId), ERR_NFT_NOT_IN_HOLDINGS);
             holdings.remove(tokenId);
             address depositer = NFTDepositer[tokenId];
-            if (depositer == msg.sender || block.timestamp > (NFTDepositTimes[tokenId].add(lockingPeriod))) {
-                transferERC721(NFTAddress, msg.sender, tokenId);
-                reserve.reduceMinterDepositNFT(depositer, tokenId);
-                delete NFTDepositer[tokenId];
-                delete NFTDepositTimes[tokenId];
-            }
+            require(depositer == msg.sender || block.timestamp > (NFTDepositTimes[tokenId].add(lockingPeriod)), ERR_WITHIN_LOCKING_PERIOD);
+            transferERC721(NFTAddress, msg.sender, tokenId);
+            reserve.reduceMinterDepositNFT(depositer, tokenId);
+            delete NFTDepositer[tokenId];
+            delete NFTDepositTimes[tokenId];
         }
         synth.burnSynth(msg.sender, msg.sender, tokenIds.length.mul(SafeDecimalMath.unit()));
     }

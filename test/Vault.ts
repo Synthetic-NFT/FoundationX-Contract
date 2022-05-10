@@ -456,5 +456,68 @@ describe("#Vault", function () {
     });
   });
 
-  describe("User burn synth NFT", async function () {});
+  describe("User burn synth NFT", async function () {
+    let minter: SignerWithAddress;
+    let burner: SignerWithAddress;
+    let minterAddress: string;
+    let burnerAddress: string;
+    let blockTimestampBefore: number;
+    const lockingPeriod = 60;
+
+    beforeEach(async function () {
+      const blockNumBefore = await ethers.provider.getBlockNumber();
+      blockTimestampBefore = (await ethers.provider.getBlock(blockNumBefore))
+        .timestamp;
+      await setUp(
+        ethers.utils.parseUnits("1.5", decimal),
+        ethers.utils.parseUnits("1.2", decimal),
+        BigNumber.from(lockingPeriod)
+      );
+
+      const [_, minterSigner, burnerSigner] = await ethers.getSigners();
+      minter = minterSigner;
+      burner = burnerSigner;
+      minterAddress = minter.address;
+      burnerAddress = burner.address;
+
+      const depositedNFTs = [BigNumber.from(0), BigNumber.from(1)];
+      for (const depositedNFT of depositedNFTs) {
+        await NFT.mint(minterAddress, depositedNFT);
+        await NFT.connect(minter).approve(vault.address, depositedNFT);
+      }
+      await vault.connect(minter).userMintSynthNFT(depositedNFTs);
+    });
+
+    it("Minter redeem", async function () {
+      await synth
+        .connect(minter)
+        .approve(vault.address, BigNumber.from(1).mul(unit));
+      await vault.connect(minter).userBurnSynthNFT([BigNumber.from(0)]);
+      expect(await synth.totalSupply()).to.be.equal(
+        BigNumber.from(1).mul(unit)
+      );
+      expect(await synth.balanceOf(minterAddress)).to.be.equal(
+        BigNumber.from(1).mul(unit)
+      );
+      expect(await reserve.getMinterDebtNFT(minterAddress)).to.be.eql(
+        BigNumber.from(1).mul(unit)
+      );
+      expect(await reserve.getMinterDepositNFT(minterAddress)).to.be.eql([
+        BigNumber.from(1),
+      ]);
+    });
+
+    it("Burner redeem", async function () {
+      await synth
+        .connect(burner)
+        .approve(vault.address, BigNumber.from(1).mul(unit));
+      await expect(
+        vault.connect(burner).userBurnSynthNFT([BigNumber.from(0)])
+      ).to.be.revertedWith(await vault.ERR_WITHIN_LOCKING_PERIOD());
+
+      await ethers.provider.send("evm_setNextBlockTimestamp", [
+        blockTimestampBefore + lockingPeriod + 1,
+      ]);
+    });
+  });
 });
