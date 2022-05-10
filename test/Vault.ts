@@ -360,7 +360,7 @@ describe("#Vault", function () {
       });
     await Promise.all([
       oracle.setAssetPrice(tokenName, BigNumber.from(100).mul(unit)),
-      synth.mintSynth(liquidatorAddress, BigNumber.from(12).mul(unit)),
+      synth.mintToWithETH(liquidatorAddress, BigNumber.from(12).mul(unit)),
     ]);
     await synth
       .connect(liquidator)
@@ -449,6 +449,12 @@ describe("#Vault", function () {
       expect(await reserve.getMinterDepositNFT(minterAddress)).to.be.eql(
         depositedNFTs
       );
+      expect(await reserve.getMinterDebtETH(minterAddress)).to.be.equal(
+        BigNumber.from(0).mul(unit)
+      );
+      expect(await reserve.getMinterDepositETH(minterAddress)).to.be.equal(
+        BigNumber.from(0).mul(unit)
+      );
 
       await expect(
         vault.connect(minter).userMintSynthNFT([BigNumber.from(1)])
@@ -461,13 +467,10 @@ describe("#Vault", function () {
     let burner: SignerWithAddress;
     let minterAddress: string;
     let burnerAddress: string;
-    let blockTimestampBefore: number;
+    let mintBlockTimestamp: number;
     const lockingPeriod = 60;
 
     beforeEach(async function () {
-      const blockNumBefore = await ethers.provider.getBlockNumber();
-      blockTimestampBefore = (await ethers.provider.getBlock(blockNumBefore))
-        .timestamp;
       await setUp(
         ethers.utils.parseUnits("1.5", decimal),
         ethers.utils.parseUnits("1.2", decimal),
@@ -486,6 +489,10 @@ describe("#Vault", function () {
         await NFT.connect(minter).approve(vault.address, depositedNFT);
       }
       await vault.connect(minter).userMintSynthNFT(depositedNFTs);
+
+      const mintBlockNum = await ethers.provider.getBlockNumber();
+      mintBlockTimestamp = (await ethers.provider.getBlock(mintBlockNum))
+        .timestamp;
     });
 
     it("Minter redeem", async function () {
@@ -505,6 +512,12 @@ describe("#Vault", function () {
       expect(await reserve.getMinterDepositNFT(minterAddress)).to.be.eql([
         BigNumber.from(1),
       ]);
+      expect(await reserve.getMinterDebtETH(minterAddress)).to.be.equal(
+        BigNumber.from(0).mul(unit)
+      );
+      expect(await reserve.getMinterDepositETH(minterAddress)).to.be.equal(
+        BigNumber.from(0).mul(unit)
+      );
     });
 
     it("Burner redeem", async function () {
@@ -515,9 +528,31 @@ describe("#Vault", function () {
         vault.connect(burner).userBurnSynthNFT([BigNumber.from(0)])
       ).to.be.revertedWith(await vault.ERR_WITHIN_LOCKING_PERIOD());
 
+      // Minter sells one synthetic token to burner.
+      await synth
+        .connect(minter)
+        .transfer(burnerAddress, BigNumber.from(1).mul(unit));
+
       await ethers.provider.send("evm_setNextBlockTimestamp", [
-        blockTimestampBefore + lockingPeriod + 1,
+        mintBlockTimestamp + lockingPeriod + 1,
       ]);
+      await vault.connect(burner).userBurnSynthNFT([BigNumber.from(0)]);
+      expect(await synth.totalSupply()).to.be.equal(
+        BigNumber.from(1).mul(unit)
+      );
+      expect(await synth.balanceOf(minterAddress)).to.be.equal(
+        BigNumber.from(1).mul(unit)
+      );
+      expect(await reserve.getMinterDebtNFT(minterAddress)).to.be.equal(
+        BigNumber.from(1).mul(unit)
+      );
+      expect(await reserve.getMinterDepositNFT(minterAddress)).to.be.eql([
+        BigNumber.from(1),
+      ]);
+      expect(await synth.balanceOf(burnerAddress)).to.be.equal(
+        BigNumber.from(0).mul(unit)
+      );
+      expect(await NFT.ownerOf(BigNumber.from(0))).to.be.equal(burnerAddress);
     });
   });
 });

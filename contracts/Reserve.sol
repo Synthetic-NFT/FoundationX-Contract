@@ -27,6 +27,8 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
     uint256 liquidationPenalty;
 
     string public constant ERR_NFT_NOT_OWNED_BY_MINTER = "NFT not owned by minter";
+    string public constant ERR_NOT_ENOUGH_DEBT = "Not enough debt";
+    string public constant ERR_NOT_ENOUGH_DEPOSIT = "Not enough deposit";
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
@@ -75,6 +77,7 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
     }
 
     function reduceMinterDebtETH(address minter, uint amount) public onlyRole(MINTER_ROLE) {
+        require(minterDebtBalanceETH[minter] >= amount, ERR_NOT_ENOUGH_DEBT);
         minterDebtBalanceETH[minter] -= amount;
     }
 
@@ -96,6 +99,7 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
     }
 
     function reduceMinterDepositETH(address minter, uint amount) public onlyRole(MINTER_ROLE) {
+        require(minterDepositBalanceETH[minter] >= amount, ERR_NOT_ENOUGH_DEPOSIT);
         minterDepositBalanceETH[minter] -= amount;
     }
 
