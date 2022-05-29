@@ -2,14 +2,20 @@
 pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 
 
 /**
  * @title ERC721Mock
  * This mock just provides a public safeMint, mint, and burn functions for testing purposes
  */
-contract MockNFT is Initializable, ERC721Upgradeable {
+contract MockNFT is Initializable, AccessControlUpgradeable, ERC721EnumerableUpgradeable {
+    using EnumerableMap for EnumerableMap.UintToAddressMap;
+
+    mapping(uint => string) private tokenURIs;
+    uint[] private tokenIds;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
@@ -18,7 +24,13 @@ contract MockNFT is Initializable, ERC721Upgradeable {
         string memory _tokenName,
         string memory _tokenSymbol
     ) initializer public {
-        __ERC721_init(_tokenName, _tokenSymbol);
+        __AccessControl_init();
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        __ERC721_init_unchained(_tokenName, _tokenSymbol);
+    }
+
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721EnumerableUpgradeable, AccessControlUpgradeable) returns (bool) {
+        return ERC721EnumerableUpgradeable.supportsInterface(interfaceId) || AccessControlUpgradeable.supportsInterface(interfaceId);
     }
 
     function exists(uint256 tokenId) public view returns (bool) {
@@ -35,6 +47,23 @@ contract MockNFT is Initializable, ERC721Upgradeable {
 
     function burn(uint256 tokenId) public {
         _burn(tokenId);
+    }
+
+    function batchSetTokenURI(uint256[] calldata _tokenIds, string[] calldata _tokenURIs) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_tokenIds.length == _tokenURIs.length);
+        tokenIds = _tokenIds;
+        for (uint i = 0; i < _tokenIds.length; i++) {
+            tokenURIs[_tokenIds[i]] = _tokenURIs[i];
+        }
+    }
+
+    function batchTokenURI() public view returns (uint256[] memory _tokenIds, string[] memory _tokenURIs) {
+        uint numTokens = tokenIds.length;
+        _tokenIds = tokenIds;
+        _tokenURIs = new string[](numTokens);
+        for (uint i = 0; i < numTokens; i++) {
+            _tokenURIs[i] = tokenURIs[tokenIds[i]];
+        }
     }
 
     /**
