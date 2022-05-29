@@ -47,6 +47,26 @@ describe("#Reserve", function () {
     ).to.equal(ethers.utils.parseUnits("1.3", decimal));
   });
 
+  it("Get active addresses", async function () {
+    await setUp(
+      ethers.utils.parseUnits("1.25", decimal),
+      ethers.utils.parseUnits("1.1", decimal)
+    );
+    const [_, signer] = await ethers.getSigners();
+    const signerAddress = signer.address;
+    await Promise.all([
+      reserve.addMinterDepositETH(signerAddress, BigNumber.from(130).mul(unit)),
+      reserve.addMinterDebtETH(signerAddress, BigNumber.from(1).mul(unit)),
+    ]);
+    expect(await reserve.getActiveAddresses()).to.deep.equal([signerAddress]);
+
+    await reserve.reduceMinterDebtETH(
+      signerAddress,
+      BigNumber.from(1).mul(unit)
+    );
+    expect(await reserve.getActiveAddresses()).to.deep.equal([]);
+  });
+
   it("Set and unset liquidation", async function () {
     await setUp(
       ethers.utils.parseUnits("1.5", decimal),

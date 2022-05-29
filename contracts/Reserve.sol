@@ -14,12 +14,15 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
     using SafeMath for uint;
     using SafeDecimalMath for uint;
     using EnumerableSet for EnumerableSet.UintSet;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     mapping(address => uint) minterDebtBalanceETH;
     mapping(address => uint) minterDepositBalanceETH;
+    EnumerableSet.AddressSet activeAddresses;
+
     mapping(address => EnumerableSet.UintSet) minterDepositBalanceNFT;
     mapping(address => bool) liquidatableUsers;
 
@@ -56,6 +59,10 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
         minCollateralRatio = collateralRatio;
     }
 
+    function getActiveAddresses() public view returns(address[] memory) {
+        return activeAddresses.values();
+    }
+
     function getMinCollateralRatio() public view returns (uint) {
         return minCollateralRatio;
     }
@@ -74,11 +81,17 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
 
     function addMinterDebtETH(address minter, uint amount) public onlyRole(MINTER_ROLE) {
         minterDebtBalanceETH[minter] += amount;
+        activeAddresses.add(minter);
     }
 
     function reduceMinterDebtETH(address minter, uint amount) public onlyRole(MINTER_ROLE) {
         require(minterDebtBalanceETH[minter] >= amount, ERR_NOT_ENOUGH_DEBT);
         minterDebtBalanceETH[minter] -= amount;
+
+        // if user's position is sufficiently small, we will mark it as inactive (for liquidation purpose)
+        if(minterDebtBalanceETH[minter]<1000) {
+            activeAddresses.remove(minter);
+        }
     }
 
     function getMinterDebtETH(address minter) public view returns (uint) {
