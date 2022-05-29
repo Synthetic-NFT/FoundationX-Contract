@@ -22,6 +22,7 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
     mapping(address => uint) minterDebtBalanceETH;
     mapping(address => uint) minterDepositBalanceETH;
     EnumerableSet.AddressSet activeAddresses;
+    uint constant MIN_ACTIVE_BALANCE = 1000;
 
     mapping(address => EnumerableSet.UintSet) minterDepositBalanceNFT;
     mapping(address => bool) liquidatableUsers;
@@ -89,7 +90,7 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
         minterDebtBalanceETH[minter] -= amount;
 
         // if user's position is sufficiently small, we will mark it as inactive (for liquidation purpose)
-        if(minterDebtBalanceETH[minter]<1000) {
+        if(minterDebtBalanceETH[minter] < MIN_ACTIVE_BALANCE) {
             activeAddresses.remove(minter);
         }
     }
