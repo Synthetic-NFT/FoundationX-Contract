@@ -5,6 +5,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 
 /**
@@ -13,9 +14,11 @@ import "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
  */
 contract MockNFT is Initializable, AccessControlUpgradeable, ERC721EnumerableUpgradeable {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
+    using EnumerableSet for EnumerableSet.UintSet;
 
     mapping(uint => string) private tokenURIs;
-    uint[] private tokenIds;
+    // Remaining token IDs that can be minted.
+    EnumerableSet.UintSet remainingTokenIds;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
@@ -43,6 +46,7 @@ contract MockNFT is Initializable, AccessControlUpgradeable, ERC721EnumerableUpg
 
     function safeMint(address to, uint256 tokenId) public {
         _safeMint(to, tokenId);
+        remainingTokenIds.remove(tokenId);
     }
 
     function burn(uint256 tokenId) public {
@@ -51,18 +55,19 @@ contract MockNFT is Initializable, AccessControlUpgradeable, ERC721EnumerableUpg
 
     function batchSetTokenURI(uint256[] calldata _tokenIds, string[] calldata _tokenURIs) public onlyRole(DEFAULT_ADMIN_ROLE) {
         require(_tokenIds.length == _tokenURIs.length);
-        tokenIds = _tokenIds;
         for (uint i = 0; i < _tokenIds.length; i++) {
             tokenURIs[_tokenIds[i]] = _tokenURIs[i];
+            remainingTokenIds.add(_tokenIds[i]);
         }
     }
 
-    function batchTokenURI() public view returns (uint256[] memory _tokenIds, string[] memory _tokenURIs) {
-        uint numTokens = tokenIds.length;
-        _tokenIds = tokenIds;
+    function remainingTokenURI() public view returns (uint256[] memory _tokenIds, string[] memory _tokenURIs) {
+        uint numTokens = remainingTokenIds.length();
+        _tokenIds = new uint256[](numTokens);
         _tokenURIs = new string[](numTokens);
         for (uint i = 0; i < numTokens; i++) {
-            _tokenURIs[i] = tokenURIs[tokenIds[i]];
+            _tokenIds[i] = remainingTokenIds.at(i);
+            _tokenURIs[i] = tokenURIs[_tokenIds[i]];
         }
     }
 
