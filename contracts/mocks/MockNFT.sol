@@ -53,6 +53,10 @@ contract MockNFT is Initializable, AccessControlUpgradeable, ERC721EnumerableUpg
         _burn(tokenId);
     }
 
+    function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
+        return tokenURIs[tokenId];
+    }
+
     function batchSetTokenURI(uint256[] calldata _tokenIds, string[] calldata _tokenURIs) public onlyRole(DEFAULT_ADMIN_ROLE) {
         require(_tokenIds.length == _tokenURIs.length);
         for (uint i = 0; i < _tokenIds.length; i++) {

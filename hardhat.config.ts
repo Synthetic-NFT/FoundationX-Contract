@@ -10,7 +10,7 @@ import "hardhat-gas-reporter";
 import "solidity-coverage";
 
 require("@openzeppelin/hardhat-upgrades");
-require('hardhat-abi-exporter');
+require("hardhat-abi-exporter");
 
 dotenv.config();
 

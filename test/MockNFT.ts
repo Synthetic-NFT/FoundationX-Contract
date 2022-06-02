@@ -26,5 +26,7 @@ describe("#MockNFT", function () {
     const [remainingIds, remainingURIs] = await NFT.remainingTokenURI();
     expect(new Set(remainingIds)).to.be.eql(new Set(tokenIds.slice(1)));
     expect(new Set(remainingURIs)).to.be.eql(new Set(tokenURIs.slice(1)));
+
+    expect(await NFT.tokenURI(BigNumber.from(2))).to.be.equal("2.png");
   });
 });
