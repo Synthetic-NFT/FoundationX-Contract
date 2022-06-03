@@ -49,8 +49,8 @@ describe("#Synth", function () {
 
     const [owner, signer1, signer2] = await ethers.getSigners();
 
-    await synth.mintToWithETH(signer1.address, BigNumber.from(10).mul(unit));
-    await synth.mintToWithETH(signer2.address, BigNumber.from(20).mul(unit));
+    await synth.mintWithETH(signer1.address, BigNumber.from(10).mul(unit));
+    await synth.mintWithETH(signer2.address, BigNumber.from(20).mul(unit));
 
     const assertBalance = async function (address: string, balance: BigNumber) {
       expect(await reserve.getMinterDebtETH(address)).to.equal(balance);
@@ -132,7 +132,7 @@ describe("#Synth", function () {
         BigNumber.from(1400).mul(unit),
         BigNumber.from(100).mul(unit)
       );
-      await synth.mintToWithETH(liquidatorAddress, BigNumber.from(5).mul(unit));
+      await synth.mintWithETH(liquidatorAddress, BigNumber.from(5).mul(unit));
       await expect(
         synth.liquidateDelinquentAccount(
           minterAddress,
@@ -148,7 +148,7 @@ describe("#Synth", function () {
         BigNumber.from(1400).mul(unit),
         BigNumber.from(100).mul(unit)
       );
-      await synth.mintToWithETH(liquidatorAddress, BigNumber.from(3).mul(unit));
+      await synth.mintWithETH(liquidatorAddress, BigNumber.from(3).mul(unit));
       await synth
         .connect(liquidatorSigner)
         .approve(ownerAddress, BigNumber.from(3).mul(unit));
@@ -185,10 +185,7 @@ describe("#Synth", function () {
         BigNumber.from(2700).mul(unit),
         BigNumber.from(100).mul(unit)
       );
-      await synth.mintToWithETH(
-        liquidatorAddress,
-        BigNumber.from(12).mul(unit)
-      );
+      await synth.mintWithETH(liquidatorAddress, BigNumber.from(12).mul(unit));
       await synth
         .connect(liquidatorSigner)
         .approve(ownerAddress, BigNumber.from(11).mul(unit));
@@ -225,10 +222,7 @@ describe("#Synth", function () {
         BigNumber.from(1150).mul(unit),
         BigNumber.from(100).mul(unit)
       );
-      await synth.mintToWithETH(
-        liquidatorAddress,
-        BigNumber.from(12).mul(unit)
-      );
+      await synth.mintWithETH(liquidatorAddress, BigNumber.from(12).mul(unit));
       await synth
         .connect(liquidatorSigner)
         .approve(ownerAddress, BigNumber.from(11).mul(unit));
@@ -265,10 +259,7 @@ describe("#Synth", function () {
         BigNumber.from(1300).mul(unit),
         BigNumber.from(100).mul(unit)
       );
-      await synth.mintToWithETH(
-        liquidatorAddress,
-        BigNumber.from(12).mul(unit)
-      );
+      await synth.mintWithETH(liquidatorAddress, BigNumber.from(12).mul(unit));
       await synth
         .connect(liquidatorSigner)
         .approve(ownerAddress, BigNumber.from(11).mul(unit));

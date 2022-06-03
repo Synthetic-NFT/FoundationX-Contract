@@ -361,7 +361,7 @@ describe("#Vault", function () {
       });
     await Promise.all([
       oracle.setAssetPrice(tokenName, BigNumber.from(100).mul(unit)),
-      synth.mintTo(liquidatorAddress, BigNumber.from(22).mul(unit)),
+      synth.mint(liquidatorAddress, BigNumber.from(22).mul(unit)),
     ]);
     await synth
       .connect(liquidator)

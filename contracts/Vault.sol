@@ -15,13 +15,15 @@ import "./Greeter.sol";
 
 
 contract Vault is AccessControlUpgradeable, UUPSUpgradeable, ERC721HolderUpgradeable {
-
     using SafeMath for uint;
     using SafeDecimalMath for uint;
     using EnumerableSet for EnumerableSet.UintSet;
 
+    bytes32 public constant ARBITRAGEUR_ROLE = keccak256("ARBITRAGEUR_ROLE");
+
     Synth public synth;
     Reserve public reserve;
+    uint arbitrageurBurnedSynth;
 
     address public NFTAddress;
     EnumerableSet.UintSet holdings;
@@ -30,9 +32,8 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable, ERC721HolderUpgrade
 
     uint public lockingPeriod;
 
-    string public constant ERR_USER_UNDER_COLLATERALIZED = "User under collateralized";
-    string public constant ERR_NOT_ENOUGH_SYNTH_TO_MINT = "Not enough mintable synth";
-    string public constant ERR_BURNING_EXCEED_DEBT = "Burning amount exceeds user debt";
+    string public constant ERR_NOT_ENOUGH_ETH_TO_REDEEM = "Not enough ETH to redeem";
+    string public constant ERR_NOT_ENOUGH_SYNTH_TO_MINT = "Not enough Synth to mint";
     string public constant ERR_INVALID_TARGET_DEPOSIT = "Invalid target deposit";
     string public constant ERR_INVALID_TARGET_COLLATERAL_RATIO = "Invalid target collateral ratio";
     string public constant ERR_NFT_ALREADY_IN_HOLDINGS = "NFT already in holdings";
@@ -52,6 +53,7 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable, ERC721HolderUpgrade
         __UUPSUpgradeable_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(ARBITRAGEUR_ROLE, msg.sender);
         synth = _synth;
         reserve = _reserve;
         NFTAddress = _NFTAddress;
@@ -76,13 +78,27 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable, ERC721HolderUpgrade
         require(targetCollateralRatio >= reserve.getMinCollateralRatio(), ERR_INVALID_TARGET_COLLATERAL_RATIO);
     }
 
+    function arbitrageurMintSynth() external onlyRole(ARBITRAGEUR_ROLE) payable lock {
+        uint synthMinted = msg.value.divideDecimal(synth.getSynthPriceToEth());
+        require(synthMinted <= arbitrageurBurnedSynth, ERR_NOT_ENOUGH_SYNTH_TO_MINT);
+        synth.mint(msg.sender, synthMinted);
+    }
+
+    function arbitrageurBurnSynth(uint synthBurned) external onlyRole(ARBITRAGEUR_ROLE) lock {
+        uint ethRedeemed = synthBurned.multiplyDecimal(synth.getSynthPriceToEth());
+        require(address(this).balance >= ethRedeemed, ERR_NOT_ENOUGH_ETH_TO_REDEEM);
+        arbitrageurBurnedSynth += synthBurned;
+        synth.burn(msg.sender, synthBurned);
+        payable(msg.sender).transfer(ethRedeemed);
+    }
+
     function userMintSynthETH(uint targetCollateralRatio) external payable lock {
         checkTargetCollateralRatio(targetCollateralRatio);
         reserve.addMinterDepositETH(msg.sender, msg.value);
-        synth.mintToWithETH(msg.sender, msg.value.divideDecimal(targetCollateralRatio.multiplyDecimal(synth.getSynthPriceToEth())));
+        synth.mintWithETH(msg.sender, msg.value.divideDecimal(targetCollateralRatio.multiplyDecimal(synth.getSynthPriceToEth())));
     }
 
-    function userBurnSynthETH() external payable lock {
+    function userBurnSynthETH() external lock {
         internalUserManageSynthETH(reserve.getMinCollateralRatio(), 0);
     }
 
@@ -103,7 +119,7 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable, ERC721HolderUpgrade
         if (originalDebt > targetDebt) {
             synth.burnFromWithETH(msg.sender, msg.sender, originalDebt.sub(targetDebt));
         } else if (originalDebt < targetDebt) {
-            synth.mintToWithETH(msg.sender, targetDebt - originalDebt);
+            synth.mintWithETH(msg.sender, targetDebt - originalDebt);
         }
 
         uint originalDeposit = reserve.getMinterDepositETH(msg.sender);
@@ -172,7 +188,7 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable, ERC721HolderUpgrade
             NFTDepositer[tokenId] = msg.sender;
             NFTDepositTimes[tokenId] = block.timestamp;
         }
-        synth.mintTo(msg.sender, tokenIds.length.mul(SafeDecimalMath.unit()));
+        synth.mint(msg.sender, tokenIds.length.mul(SafeDecimalMath.unit()));
     }
 
     function userBurnSynthNFT(uint[] calldata tokenIds) external lock {
@@ -187,6 +203,6 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable, ERC721HolderUpgrade
             delete NFTDepositer[tokenId];
             delete NFTDepositTimes[tokenId];
         }
-        synth.burnFrom(msg.sender, tokenIds.length.mul(SafeDecimalMath.unit()));
+        synth.burn(msg.sender, tokenIds.length.mul(SafeDecimalMath.unit()));
     }
 }

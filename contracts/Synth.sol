@@ -2,7 +2,6 @@
 pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -16,7 +15,7 @@ import "./Reserve.sol";
 import "./interfaces/IOracle.sol";
 import "hardhat/console.sol";
 
-contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable {
+contract Synth is ISynth, Initializable, ERC20Upgradeable, PausableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable {
     using SafeMath for uint;
     using SafeDecimalMath for uint;
 
@@ -42,7 +41,6 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
         string memory _tokenSymbol
     ) initializer public {
         __ERC20_init(_tokenName, _tokenSymbol);
-        __ERC20Burnable_init();
         __Pausable_init();
         __AccessControl_init();
         __UUPSUpgradeable_init();
@@ -76,12 +74,16 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
         synthPrice = oracle.getAssetPrice(tokenName);
     }
 
-    function mintTo(address minter, uint amount) public onlyRole(MINTER_ROLE) {
-        _mint(minter, amount);
+    function mint(address account, uint amount) public onlyRole(MINTER_ROLE) {
+        _mint(account, amount);
+    }
+
+    function burn(address account, uint256 amount) public onlyRole(MINTER_ROLE) {
+        _burn(account, amount);
     }
 
     // Mint synthetic token and add minter's debt.
-    function mintToWithETH(address minter, uint amount) public onlyRole(MINTER_ROLE) {
+    function mintWithETH(address minter, uint amount) public onlyRole(MINTER_ROLE) {
         _mint(minter, amount);
         reserve.addMinterDebtETH(minter, amount);
     }
@@ -89,7 +91,7 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
     // Burn synthetic token and reduce minter's debt.
     function burnFromWithETH(address debtAccount, address burnAccount, uint amount) public onlyRole(MINTER_ROLE) {
         // synth.burn does a safe subtraction on balance (so it will revert if there are not enough synths).
-        burnFrom(burnAccount, amount);
+        burn(burnAccount, amount);
 
         // Account for the burnt debt in the cache.
         reserve.reduceMinterDebtETH(debtAccount, amount);
