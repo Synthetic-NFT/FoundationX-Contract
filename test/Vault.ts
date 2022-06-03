@@ -21,6 +21,7 @@ import {
   deploySynth,
   deployVault,
 } from "./shared/constructor";
+import { experimentalAddHardhatNetworkMessageTraceHook } from "hardhat/config";
 
 describe("#Vault", function () {
   let librarySafeDecimalMath: SafeDecimalMath;
@@ -182,7 +183,7 @@ describe("#Vault", function () {
       closeBigNumber(
         minterEthBalance,
         BigNumber.from(400).mul(unit),
-        BigNumber.from(1).mul(unit)
+        ethers.utils.parseUnits("0.01", decimal)
       )
     ).to.true;
   });
@@ -226,7 +227,7 @@ describe("#Vault", function () {
         closeBigNumber(
           minterDeposit,
           await getEthBalance(minterAddress),
-          BigNumber.from(1).mul(unit.sub(4))
+          ethers.utils.parseUnits("0.0001", decimal)
         )
       );
     };
@@ -348,7 +349,7 @@ describe("#Vault", function () {
       setUpUserAccount(minter, BigNumber.from(3100).mul(unit)),
       network.provider.send("hardhat_setBalance", [
         liquidator.address,
-        BigNumber.from(300).mul(unit).toHexString(),
+        BigNumber.from(400).mul(unit).toHexString(),
       ]),
       oracle.setAssetPrice(tokenName, BigNumber.from(60).mul(unit)),
     ]);
@@ -360,15 +361,15 @@ describe("#Vault", function () {
       });
     await Promise.all([
       oracle.setAssetPrice(tokenName, BigNumber.from(100).mul(unit)),
-      synth.mintToWithETH(liquidatorAddress, BigNumber.from(12).mul(unit)),
+      synth.mintTo(liquidatorAddress, BigNumber.from(22).mul(unit)),
     ]);
     await synth
       .connect(liquidator)
-      .approve(vault.address, BigNumber.from(11).mul(unit));
+      .approve(vault.address, BigNumber.from(21).mul(unit));
 
     await vault
       .connect(liquidator)
-      .userLiquidateETH(minterAddress, BigNumber.from(11).mul(unit));
+      .userLiquidateETH(minterAddress, BigNumber.from(21).mul(unit));
 
     expect(await synth.balanceOf(liquidatorAddress)).to.equal(
       BigNumber.from(2).mul(unit)
@@ -376,28 +377,42 @@ describe("#Vault", function () {
     expect(await synth.balanceOf(minterAddress)).to.equal(
       BigNumber.from(20).mul(unit)
     );
-    const minterDeposit = await reserve.getMinterDebtETH(minterAddress);
-    expect(
-      closeBigNumber(
-        minterDeposit,
-        BigNumber.from(1500).mul(unit),
-        BigNumber.from(1).mul(unit.sub(4))
-      )
+
+    expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
+      BigNumber.from(300).mul(unit)
     );
     expect(await reserve.getMinterDebtETH(minterAddress)).to.equal(
-      BigNumber.from(10).mul(unit)
+      BigNumber.from(0).mul(unit)
     );
+
     expect(await getEthBalance(vault.address)).to.equal(
-      BigNumber.from(1500).mul(unit)
+      BigNumber.from(300).mul(unit)
     );
     const liquidatorBalance = await getEthBalance(liquidatorAddress);
     expect(
       closeBigNumber(
         liquidatorBalance,
-        BigNumber.from(1500).mul(unit),
-        BigNumber.from(1).mul(unit.sub(4))
+        BigNumber.from(2800).mul(unit),
+        ethers.utils.parseUnits("0.0001", decimal)
       )
     );
+
+    // Minter redeem remaining ETH.
+    await vault.connect(minter).userBurnSynthETH();
+    expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
+      BigNumber.from(0).mul(unit)
+    );
+    expect(await getEthBalance(vault.address)).to.equal(
+      BigNumber.from(0).mul(unit)
+    );
+    const minterBalance = await getEthBalance(minterAddress);
+    expect(
+      closeBigNumber(
+        minterBalance,
+        BigNumber.from(700).mul(unit),
+        ethers.utils.parseUnits("0.001", decimal)
+      )
+    ).to.equal(true);
   });
 
   describe("User mint synth NFT", async function () {

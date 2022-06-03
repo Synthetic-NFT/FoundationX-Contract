@@ -113,10 +113,9 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable, ERC721HolderUpgrade
         }
     }
 
-    function userLiquidateETH(address account, uint synthAmount) external payable lock returns (bool) {
+    function userLiquidateETH(address account, uint synthAmount) external payable lock {
         (uint totalRedeemed, uint amountToLiquidate) = synth.liquidateDelinquentAccount(account, synthAmount, msg.sender);
         payable(msg.sender).transfer(totalRedeemed);
-        return true;
     }
 
     function transferERC721(address assetAddr, address to, uint256 tokenId) internal {

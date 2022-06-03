@@ -80,11 +80,13 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
         _mint(minter, amount);
     }
 
+    // Mint synthetic token and add minter's debt.
     function mintToWithETH(address minter, uint amount) public onlyRole(MINTER_ROLE) {
         _mint(minter, amount);
         reserve.addMinterDebtETH(minter, amount);
     }
 
+    // Burn synthetic token and reduce minter's debt.
     function burnFromWithETH(address debtAccount, address burnAccount, uint amount) public onlyRole(MINTER_ROLE) {
         // synth.burn does a safe subtraction on balance (so it will revert if there are not enough synths).
         burnFrom(burnAccount, amount);
@@ -93,56 +95,32 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, ERC20BurnableUpgradea
         reserve.reduceMinterDebtETH(debtAccount, amount);
     }
 
-    function liquidateDelinquentAccount(
-        address account,
-        uint synthAmount,
-        address liquidator
-    ) public onlyRole(MINTER_ROLE) returns (uint totalRedeemed, uint amountToLiquidate) {
-        // Check account is liquidation open
+    function liquidateDelinquentAccount(address account, uint synthAmount, address liquidator) public onlyRole(MINTER_ROLE) returns (uint totalRedeemed, uint amountToLiquidate) {
         uint synthPrice = getSynthPriceToEth();
-        uint minterDebt = reserve.getMinterDebtETH(account);
         uint minterCollateralRatio = reserve.getMinterCollateralRatio(account, synthPrice);
         require(minterCollateralRatio <= reserve.getMinCollateralRatio(), ERR_LIQUIDATE_ABOVE_MIN_COLLATERAL_RATIO);
-
         reserve.flagAccountForLiquidation(account);
 
-        // require liquidator has enough sUSD
         require(IERC20(address(this)).balanceOf(liquidator) >= synthAmount, ERR_LIQUIDATE_NOT_ENOUGH_SYNTH);
 
-        uint liquidationPenalty = reserve.getLiquidationPenalty();
-
-        // What is their debt in ETH?
+        uint minterDebt = reserve.getMinterDebtETH(account);
+        uint minterDeposit = reserve.getMinterDepositETH(account);
         uint liquidateSynthEthValue = synthPrice.multiplyDecimal(synthAmount > minterDebt ? minterDebt : synthAmount);
 
-        uint collateralForAccount = reserve.getMinterDepositETH(account);
-
-        uint amountToFixCollateralRatio = reserve.calculateAmountToFixCollateral(synthPrice.multiplyDecimal(minterDebt), collateralForAccount);
-
-        // Cap amount to liquidate to repair collateral ratio based on issuance ratio
-        amountToLiquidate = amountToFixCollateralRatio < liquidateSynthEthValue ? amountToFixCollateralRatio : liquidateSynthEthValue;
-
-        // what's the equivalent amount of synth for the amountToLiquidate?
-        uint synthLiquidated = amountToLiquidate.divideDecimalRound(synthPrice);
-
-        // Add penalty
-        // Note that if minter's collateral ratio is already below discount ratio, we use the current collateral ratio for discount to prevent the collateral ratio after liquidation from dropping below 1.0.
-        totalRedeemed = amountToLiquidate.multiplyDecimal(minterCollateralRatio < liquidationPenalty ? minterCollateralRatio : liquidationPenalty);
-
-        // if total SNX to redeem is greater than account's collateral
-        // account is under collateralized, liquidate all collateral and reduce sUSD to burn
-        if (totalRedeemed > collateralForAccount) {
-            // set totalRedeemed to all transferable collateral
-            totalRedeemed = collateralForAccount;
-
-            // whats the equivalent sUSD to burn for all collateral less penalty
-            synthLiquidated = totalRedeemed.divideDecimal(liquidationPenalty).divideDecimal(synthPrice);
+        uint liquidationPenalty = reserve.getLiquidationPenalty();
+        amountToLiquidate = minterDebt < synthAmount ? minterDebt : synthAmount;
+        totalRedeemed = amountToLiquidate.multiplyDecimal(minterCollateralRatio < liquidationPenalty ? minterCollateralRatio : liquidationPenalty).multiplyDecimal(synthPrice);
+        // Account for numerical errors.
+        if (totalRedeemed > minterDeposit) {
+            totalRedeemed = minterDeposit;
         }
 
-        // burn sUSD from messageSender (liquidator) and reduce account's debt
-        burnFromWithETH(account, liquidator, synthLiquidated);
+        // Burn synth from liquidator and reduce minter's debt
         reserve.reduceMinterDepositETH(account, totalRedeemed);
+        burnFromWithETH(account, liquidator, amountToLiquidate);
+
         // Remove liquidation flag if amount liquidated fixes ratio
-        if (amountToLiquidate >= amountToFixCollateralRatio || synthLiquidated >= minterDebt) {
+        if (reserve.getMinterDebt(account) == 0 || reserve.getMinterCollateralRatio(account, synthPrice) > reserve.getMinCollateralRatio()) {
             // Remove liquidation
             reserve.removeAccountInLiquidation(account);
         }

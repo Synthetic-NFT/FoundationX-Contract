@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { ethers, upgrades } from "hardhat";
+import { ethers } from "hardhat";
 import { MockOracle, Reserve, SafeDecimalMath, Synth } from "../typechain";
 import { beforeEach, describe, it } from "mocha";
 
@@ -160,7 +160,7 @@ describe("#Synth", function () {
           liquidatorAddress
         );
       expect(totalRedeemed).to.be.equal(BigNumber.from(360).mul(unit));
-      expect(amountToLiquidate).to.be.equal(BigNumber.from(300).mul(unit));
+      expect(amountToLiquidate).to.be.equal(BigNumber.from(3).mul(unit));
 
       await synth.liquidateDelinquentAccount(
         minterAddress,
@@ -185,7 +185,10 @@ describe("#Synth", function () {
         BigNumber.from(2700).mul(unit),
         BigNumber.from(100).mul(unit)
       );
-      await synth.mintToWithETH(liquidatorAddress, BigNumber.from(12).mul(unit));
+      await synth.mintToWithETH(
+        liquidatorAddress,
+        BigNumber.from(12).mul(unit)
+      );
       await synth
         .connect(liquidatorSigner)
         .approve(ownerAddress, BigNumber.from(11).mul(unit));
@@ -196,8 +199,8 @@ describe("#Synth", function () {
           BigNumber.from(11).mul(unit),
           liquidatorAddress
         );
-      expect(totalRedeemed).to.be.equal(BigNumber.from(1200).mul(unit));
-      expect(amountToLiquidate).to.be.equal(BigNumber.from(1000).mul(unit));
+      expect(totalRedeemed).to.be.equal(BigNumber.from(1320).mul(unit));
+      expect(amountToLiquidate).to.be.equal(BigNumber.from(11).mul(unit));
 
       await synth.liquidateDelinquentAccount(
         minterAddress,
@@ -205,14 +208,14 @@ describe("#Synth", function () {
         liquidatorAddress
       );
       expect(await reserve.getMinterDebtETH(minterAddress)).to.equal(
-        BigNumber.from(10).mul(unit)
+        BigNumber.from(9).mul(unit)
       );
       expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
-        BigNumber.from(1500).mul(unit)
+        BigNumber.from(1380).mul(unit)
       );
       expect(await reserve.isOpenForLiquidation(minterAddress)).to.equal(false);
       expect(await synth.balanceOf(liquidatorAddress)).to.equal(
-        BigNumber.from(2).mul(unit)
+        BigNumber.from(1).mul(unit)
       );
     });
 
@@ -222,7 +225,10 @@ describe("#Synth", function () {
         BigNumber.from(1150).mul(unit),
         BigNumber.from(100).mul(unit)
       );
-      await synth.mintToWithETH(liquidatorAddress, BigNumber.from(12).mul(unit));
+      await synth.mintToWithETH(
+        liquidatorAddress,
+        BigNumber.from(12).mul(unit)
+      );
       await synth
         .connect(liquidatorSigner)
         .approve(ownerAddress, BigNumber.from(11).mul(unit));
@@ -234,7 +240,7 @@ describe("#Synth", function () {
           liquidatorAddress
         );
       expect(totalRedeemed).to.be.equal(BigNumber.from(1150).mul(unit));
-      expect(amountToLiquidate).to.be.equal(BigNumber.from(1000).mul(unit));
+      expect(amountToLiquidate).to.be.equal(BigNumber.from(10).mul(unit));
 
       await synth.liquidateDelinquentAccount(
         minterAddress,
@@ -246,6 +252,46 @@ describe("#Synth", function () {
       );
       expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
         BigNumber.from(0).mul(unit)
+      );
+      expect(await reserve.isOpenForLiquidation(minterAddress)).to.equal(false);
+      expect(await synth.balanceOf(liquidatorAddress)).to.equal(
+        BigNumber.from(2).mul(unit)
+      );
+    });
+
+    it("Full liquidation remain", async function () {
+      await setMinterDebtDeposit(
+        BigNumber.from(10).mul(unit),
+        BigNumber.from(1300).mul(unit),
+        BigNumber.from(100).mul(unit)
+      );
+      await synth.mintToWithETH(
+        liquidatorAddress,
+        BigNumber.from(12).mul(unit)
+      );
+      await synth
+        .connect(liquidatorSigner)
+        .approve(ownerAddress, BigNumber.from(11).mul(unit));
+      // Note that callStatic does not change the EVM state. So we need to call this again without callStatic.
+      const [totalRedeemed, amountToLiquidate] =
+        await synth.callStatic.liquidateDelinquentAccount(
+          minterAddress,
+          BigNumber.from(11).mul(unit),
+          liquidatorAddress
+        );
+      expect(totalRedeemed).to.be.equal(BigNumber.from(1200).mul(unit));
+      expect(amountToLiquidate).to.be.equal(BigNumber.from(10).mul(unit));
+
+      await synth.liquidateDelinquentAccount(
+        minterAddress,
+        BigNumber.from(11).mul(unit),
+        liquidatorAddress
+      );
+      expect(await reserve.getMinterDebtETH(minterAddress)).to.equal(
+        BigNumber.from(0).mul(unit)
+      );
+      expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
+        BigNumber.from(100).mul(unit)
       );
       expect(await reserve.isOpenForLiquidation(minterAddress)).to.equal(false);
       expect(await synth.balanceOf(liquidatorAddress)).to.equal(
