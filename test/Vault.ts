@@ -21,7 +21,6 @@ import {
   deploySynth,
   deployVault,
 } from "./shared/constructor";
-import { experimentalAddHardhatNetworkMessageTraceHook } from "hardhat/config";
 
 describe("#Vault", function () {
   let librarySafeDecimalMath: SafeDecimalMath;
@@ -178,14 +177,13 @@ describe("#Vault", function () {
     expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
       BigNumber.from(0).mul(unit)
     );
-    const minterEthBalance = await getEthBalance(minterAddress);
     expect(
       closeBigNumber(
-        minterEthBalance,
+        await getEthBalance(minterAddress),
         BigNumber.from(400).mul(unit),
         ethers.utils.parseUnits("0.01", decimal)
       )
-    ).to.true;
+    ).to.equal(true);
   });
 
   describe("User manage synth ETH", async function () {
@@ -225,11 +223,11 @@ describe("#Vault", function () {
       );
       expect(
         closeBigNumber(
-          minterDeposit,
+          minterBalance,
           await getEthBalance(minterAddress),
-          ethers.utils.parseUnits("0.0001", decimal)
+          ethers.utils.parseUnits("0.001", decimal)
         )
-      );
+      ).to.equal(true);
     };
 
     it("Add deposit add debt", async function () {
@@ -388,14 +386,13 @@ describe("#Vault", function () {
     expect(await getEthBalance(vault.address)).to.equal(
       BigNumber.from(300).mul(unit)
     );
-    const liquidatorBalance = await getEthBalance(liquidatorAddress);
     expect(
       closeBigNumber(
-        liquidatorBalance,
+        await getEthBalance(liquidatorAddress),
         BigNumber.from(2800).mul(unit),
-        ethers.utils.parseUnits("0.0001", decimal)
+        ethers.utils.parseUnits("0.001", decimal)
       )
-    );
+    ).to.equal(true);
 
     // Minter redeem remaining ETH.
     await vault.connect(minter).userBurnSynthETH();
@@ -405,10 +402,9 @@ describe("#Vault", function () {
     expect(await getEthBalance(vault.address)).to.equal(
       BigNumber.from(0).mul(unit)
     );
-    const minterBalance = await getEthBalance(minterAddress);
     expect(
       closeBigNumber(
-        minterBalance,
+        await getEthBalance(minterAddress),
         BigNumber.from(700).mul(unit),
         ethers.utils.parseUnits("0.001", decimal)
       )
@@ -568,6 +564,93 @@ describe("#Vault", function () {
         BigNumber.from(0).mul(unit)
       );
       expect(await NFT.ownerOf(BigNumber.from(0))).to.be.equal(burnerAddress);
+    });
+  });
+
+  describe("Arbitrageur mint and burn", async function () {
+    let minter: SignerWithAddress;
+    let arbitrageur: SignerWithAddress;
+
+    beforeEach(async function () {
+      const liquidationPenalty = ethers.utils.parseUnits("1.2", decimal);
+      const minCollateralRatio = ethers.utils.parseUnits("1.5", decimal);
+      const [_, minterSigner, arbitrageurAigner] = await ethers.getSigners();
+      minter = minterSigner;
+      arbitrageur = arbitrageurAigner;
+      await setUp(
+        minCollateralRatio,
+        liquidationPenalty,
+        BigNumber.from(0).mul(unit)
+      );
+      await Promise.all([
+        setUpUserAccount(minter, BigNumber.from(400).mul(unit)),
+        setUpUserAccount(arbitrageur, BigNumber.from(300).mul(unit)),
+        oracle.setAssetPrice(tokenName, BigNumber.from(10).mul(unit)),
+        vault.grantRole(await vault.ARBITRAGEUR_ROLE(), arbitrageur.address),
+      ]);
+      await vault
+        .connect(minter)
+        .userMintSynthETH(ethers.utils.parseUnits("1.6", decimal), {
+          value: BigNumber.from(320).mul(unit),
+        });
+      await synth
+        .connect(minter)
+        .transfer(arbitrageur.address, BigNumber.from(5).mul(unit));
+    });
+
+    it("Burn", async function () {
+      await vault
+        .connect(arbitrageur)
+        .arbitrageurBurnSynth(BigNumber.from(5).mul(unit));
+      expect(await synth.balanceOf(arbitrageur.address)).to.equal(
+        BigNumber.from(0).mul(unit)
+      );
+      expect(
+        closeBigNumber(
+          await getEthBalance(arbitrageur.address),
+          BigNumber.from(350).mul(unit),
+          ethers.utils.parseUnits("0.001", decimal)
+        )
+      ).to.equal(true);
+      expect(await reserve.getMinterDebtETH(minter.address)).to.equal(
+        BigNumber.from(20).mul(unit)
+      );
+      expect(await reserve.getMinterDepositETH(minter.address)).to.equal(
+        BigNumber.from(320).mul(unit)
+      );
+    });
+
+    it("Mint invalid", async function () {
+      await vault
+        .connect(arbitrageur)
+        .arbitrageurBurnSynth(BigNumber.from(5).mul(unit));
+      await expect(
+        vault
+          .connect(arbitrageur)
+          .arbitrageurMintSynth({ value: BigNumber.from(60).mul(unit) })
+      ).to.be.revertedWith(await vault.ERR_NOT_ENOUGH_SYNTH_TO_MINT());
+    });
+
+    it("Mint valid", async function () {
+      await vault
+        .connect(arbitrageur)
+        .arbitrageurBurnSynth(BigNumber.from(5).mul(unit));
+      await vault
+        .connect(arbitrageur)
+        .arbitrageurMintSynth({ value: BigNumber.from(50).mul(unit) });
+      expect(await synth.balanceOf(arbitrageur.address)).to.equal(
+        BigNumber.from(5).mul(unit)
+      );
+      expect(await reserve.getMinterDebtETH(arbitrageur.address)).to.equal(
+        BigNumber.from(0).mul(unit)
+      );
+      expect(
+        closeBigNumber(
+          await getEthBalance(arbitrageur.address),
+          BigNumber.from(300).mul(unit),
+          ethers.utils.parseUnits("0.001", decimal)
+        )
+      ).to.equal(true);
     });
   });
 });
