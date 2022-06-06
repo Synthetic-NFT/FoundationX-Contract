@@ -7,7 +7,7 @@ import { BigNumber } from "ethers";
 import {
   deployFactory,
   deployMockNFT,
-  deployMockOracle,
+  deployOracle,
   deployReserve,
   deploySafeDecimalMath,
   deploySynth,
@@ -38,7 +38,8 @@ async function main() {
   const unit = await safeDecimalMath.unit();
   const decimal = await safeDecimalMath.decimals();
 
-  const oracle = await deployMockOracle();
+  const priceStalePeriod: BigNumber = BigNumber.from(10).mul(60);
+  const oracle = await deployOracle(owner.address, priceStalePeriod);
   console.log("Oracle deployed to:", oracle.address);
 
   const vaults: Array<string> = [];

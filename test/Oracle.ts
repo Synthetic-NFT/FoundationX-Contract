@@ -1,8 +1,9 @@
 import { expect } from "chai";
-import { ethers, upgrades } from "hardhat";
-import { Oracle, Reserve, SafeDecimalMath } from "../typechain";
+import { ethers } from "hardhat";
+import { Oracle, SafeDecimalMath } from "../typechain";
 import { beforeEach, it } from "mocha";
 import { BigNumber } from "ethers";
+import { deployOracle } from "./shared/constructor";
 
 describe("#Oracle", function () {
   let librarySafeDecimalMath: SafeDecimalMath;
@@ -16,11 +17,7 @@ describe("#Oracle", function () {
     librarySafeDecimalMath = await Library.deploy();
     unit = await librarySafeDecimalMath.UNIT();
     const [owner] = await ethers.getSigners();
-    const Oracle = await ethers.getContractFactory("Oracle");
-    oracle = (await upgrades.deployProxy(Oracle, [
-      owner.address,
-      priceStalePeriod,
-    ])) as Oracle;
+    oracle = await deployOracle(owner.address, priceStalePeriod);
     const blockNumBefore = await ethers.provider.getBlockNumber();
     blockTimestampBefore = (await ethers.provider.getBlock(blockNumBefore))
       .timestamp;

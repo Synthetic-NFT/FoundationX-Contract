@@ -5,6 +5,7 @@ import {
   IOracle,
   MockNFT,
   MockOracle,
+  Oracle,
   Reserve,
   SafeDecimalMath,
   Synth,
@@ -21,6 +22,18 @@ export async function deploySafeDecimalMath(): Promise<SafeDecimalMath> {
 export async function deployMockOracle(): Promise<MockOracle> {
   const MockOracle = await ethers.getContractFactory("MockOracle");
   const oracle = await MockOracle.deploy();
+  return oracle;
+}
+
+export async function deployOracle(
+  oracleAddress: string,
+  priceStalePeriod: BigNumber
+): Promise<Oracle> {
+  const Oracle = await ethers.getContractFactory("Oracle");
+  const oracle = (await upgrades.deployProxy(Oracle, [
+    oracleAddress,
+    priceStalePeriod,
+  ])) as Oracle;
   return oracle;
 }
 
