@@ -71,6 +71,9 @@ contract Factory is AccessControlUpgradeable, UUPSUpgradeable {
         reserveAddresses = new address[](numListedTokens);
         uint result_i = 0;
         for (uint8 i = 0; i < listedTokens.length; i++) {
+            if (result_i>=numListedTokens) {
+                break;
+            }
             string memory tokenName = listedTokens[i];
             Vault vault = vaults[tokenName];
             if (address(vault) != address(0)) {
@@ -78,6 +81,7 @@ contract Factory is AccessControlUpgradeable, UUPSUpgradeable {
                 vaultAddresses[result_i] = address(vault);
                 synthAddresses[result_i] = address(vault.synth());
                 reserveAddresses[result_i] = address(vault.reserve());
+                result_i += 1;
             }
         }
     }
