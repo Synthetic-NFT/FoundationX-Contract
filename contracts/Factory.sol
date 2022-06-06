@@ -64,8 +64,9 @@ contract Factory is AccessControlUpgradeable, UUPSUpgradeable {
         return (debts, deposits);
     }
 
-    function listTokenAddressInfo() public view returns (string[] memory tokenNames, address[] memory vaultAddresses, address[] memory synthAddresses, address[] memory reserveAddresses) {
+    function listTokenAddressInfo() public view returns (string[] memory tokenNames, string[] memory tokenSymbols, address[] memory vaultAddresses, address[] memory synthAddresses, address[] memory reserveAddresses) {
         tokenNames = new string[](numListedTokens);
+        tokenSymbols = new string[](numListedTokens);
         vaultAddresses = new address[](numListedTokens);
         synthAddresses = new address[](numListedTokens);
         reserveAddresses = new address[](numListedTokens);
@@ -78,6 +79,7 @@ contract Factory is AccessControlUpgradeable, UUPSUpgradeable {
             Vault vault = vaults[tokenName];
             if (address(vault) != address(0)) {
                 tokenNames[result_i] = tokenName;
+                tokenSymbols[result_i] = vault.synth().tokenSymbol();
                 vaultAddresses[result_i] = address(vault);
                 synthAddresses[result_i] = address(vault.synth());
                 reserveAddresses[result_i] = address(vault.reserve());

@@ -28,8 +28,8 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, PausableUpgradeable, 
 
     Reserve reserve;
     IOracle oracle;
-    string tokenName;
-    string tokenSymbol;
+    string public tokenName;
+    string public tokenSymbol;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
@@ -69,6 +69,9 @@ contract Synth is ISynth, Initializable, ERC20Upgradeable, PausableUpgradeable, 
     }
 
     function _authorizeUpgrade(address newImplementation) internal onlyRole(UPGRADER_ROLE) override {}
+
+//    function getTokenName() public view returns (tokenName){}
+//    function getTokenSymbol() public view returns (tokenSymbol){}
 
     function getSynthPriceToEth() public view returns (uint synthPrice){
         synthPrice = oracle.getAssetPrice(tokenName);
