@@ -4,7 +4,6 @@ import { Reserve, SafeDecimalMath } from "../typechain";
 import { beforeEach, it } from "mocha";
 import { BigNumber } from "ethers";
 import { deployReserve, deploySafeDecimalMath } from "./shared/constructor";
-import { createReadStream } from "fs";
 
 describe("#Reserve", function () {
   let librarySafeDecimalMath: SafeDecimalMath;
