@@ -3,15 +3,6 @@
 //
 // When running the script with `npx hardhat run <script>` you'll find the Hardhat
 // Runtime Environment's members available in the global scope.
-import { BigNumber } from "ethers";
-import {
-  deployFactory,
-  deployMockOracle,
-  deployReserve,
-  deploySafeDecimalMath,
-  deploySynth,
-  deployVault,
-} from "../test/shared/constructor";
 
 const { ethers, upgrades } = require("hardhat");
 // eslint-disable-next-line node/no-extraneous-require

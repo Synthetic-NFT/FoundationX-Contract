@@ -103,8 +103,6 @@ describe("#Factory", function () {
       ownerAddress,
       BigNumber.from(300).mul(unit)
     );
-    const temp = await factory.listUserDebtDeposit(ownerAddress, [tokenName2, tokenName1]);
-    console.log(temp[0][0].toString(), temp[0][1].toString(), temp[1][0].toString(), temp[1][1].toString());
     expect(
       await factory.listUserDebtDeposit(ownerAddress, [tokenName2, tokenName1])
     ).to.eql([
@@ -114,7 +112,6 @@ describe("#Factory", function () {
   });
 
   it("List token address info", async function () {
-    console.log(await factory.listTokenAddressInfo());
     expect(await factory.listTokenAddressInfo()).to.be.eql([
       [tokenName1, tokenName2],
       [tokenSymbol1, tokenSymbol2],

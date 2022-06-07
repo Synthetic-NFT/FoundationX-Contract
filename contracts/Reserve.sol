@@ -34,6 +34,9 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
     string public constant ERR_NOT_ENOUGH_DEBT = "Not enough debt";
     string public constant ERR_NOT_ENOUGH_DEPOSIT = "Not enough deposit";
 
+    uint16 constant DEFAULT_PAGE_SIZE = 100;
+    uint16 public pageSize;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
@@ -52,12 +55,17 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
 
         setMinCollateralRatio(_minCollateralRatio);
         setLiquidationPenalty(_liquidationPenalty);
+        setPageSize(DEFAULT_PAGE_SIZE);
     }
 
     function _authorizeUpgrade(address newImplementation) internal onlyRole(UPGRADER_ROLE) override {}
 
     function setMinCollateralRatio(uint collateralRatio) public onlyRole(DEFAULT_ADMIN_ROLE) {
         minCollateralRatio = collateralRatio;
+    }
+
+    function setPageSize(uint16 _pageSize) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        pageSize = _pageSize;
     }
 
     function getActiveAddresses() public view returns(address[] memory) {
@@ -162,6 +170,27 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
         require(liquidatableUsers[account], "User has not liquidation open");
         if (getMinterCollateralRatio(account, assetPrice) > minCollateralRatio) {
             removeAccountInLiquidation(account);
+        }
+    }
+
+    function getNumPages() external view returns (uint) {
+        return activeAddresses.length() % uint(pageSize);
+    }
+
+    function getUserReserveInfo(uint pageIndex, uint256 assetPrice) external view returns (address[] memory addresses, uint256[] memory debts, uint256[] memory collateralRatios) {
+        uint startIndex = pageIndex * uint(pageSize);
+        require(startIndex < activeAddresses.length());
+        uint resultSize256 = activeAddresses.length() - startIndex;
+        uint16 resultSize = resultSize256 < uint256(pageSize) ? uint16(resultSize256) : pageSize;
+        addresses = new address[](resultSize);
+        debts = new uint256[](resultSize);
+        collateralRatios = new uint256[](resultSize);
+
+        for (uint16 i = 0; i < resultSize; i++) {
+            address minterAddress = activeAddresses.at(pageIndex * pageSize + i);
+            addresses[i] = minterAddress;
+            debts[i] = minterDebtBalanceETH[minterAddress];
+            collateralRatios[i] = getMinterCollateralRatio(minterAddress, assetPrice);
         }
     }
 
