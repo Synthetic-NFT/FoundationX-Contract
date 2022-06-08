@@ -4,6 +4,7 @@ pragma solidity ^0.8.4;
 import "./interfaces/IFactory.sol";
 import "./Synth.sol";
 import "./Reserve.sol";
+import "./interfaces/IVault.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
@@ -14,7 +15,7 @@ import "hardhat/console.sol";
 import "./Greeter.sol";
 
 
-contract Vault is AccessControlUpgradeable, UUPSUpgradeable, ERC721HolderUpgradeable {
+contract Vault is IVault, AccessControlUpgradeable, UUPSUpgradeable, ERC721HolderUpgradeable {
     using SafeMath for uint;
     using SafeDecimalMath for uint;
     using EnumerableSet for EnumerableSet.UintSet;
@@ -78,13 +79,17 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable, ERC721HolderUpgrade
         require(targetCollateralRatio >= reserve.getMinCollateralRatio(), ERR_INVALID_TARGET_COLLATERAL_RATIO);
     }
 
-    function arbitrageurMintSynth() external onlyRole(ARBITRAGEUR_ROLE) payable lock {
+    function getArbitrageurMintedSynth() external view override onlyRole(ARBITRAGEUR_ROLE) returns (uint) {
+        return arbitrageurBurnedSynth;
+    }
+
+    function arbitrageurMintSynth() external override onlyRole(ARBITRAGEUR_ROLE) payable lock {
         uint synthMinted = msg.value.divideDecimal(synth.getSynthPriceToEth());
         require(synthMinted <= arbitrageurBurnedSynth, ERR_NOT_ENOUGH_SYNTH_TO_MINT);
         synth.mint(msg.sender, synthMinted);
     }
 
-    function arbitrageurBurnSynth(uint synthBurned) external onlyRole(ARBITRAGEUR_ROLE) lock {
+    function arbitrageurBurnSynth(uint synthBurned) override external onlyRole(ARBITRAGEUR_ROLE) lock {
         uint ethRedeemed = synthBurned.multiplyDecimal(synth.getSynthPriceToEth());
         require(address(this).balance >= ethRedeemed, ERR_NOT_ENOUGH_ETH_TO_REDEEM);
         arbitrageurBurnedSynth += synthBurned;
@@ -129,7 +134,7 @@ contract Vault is AccessControlUpgradeable, UUPSUpgradeable, ERC721HolderUpgrade
         }
     }
 
-    function userLiquidateETH(address account, uint synthAmount) external payable lock {
+    function userLiquidateETH(address account, uint synthAmount) external override payable lock {
         (uint totalRedeemed, uint amountToLiquidate) = synth.liquidateDelinquentAccount(account, synthAmount, msg.sender);
         payable(msg.sender).transfer(totalRedeemed);
     }

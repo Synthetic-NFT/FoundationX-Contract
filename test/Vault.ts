@@ -602,6 +602,9 @@ describe("#Vault", function () {
       await vault
         .connect(arbitrageur)
         .arbitrageurBurnSynth(BigNumber.from(5).mul(unit));
+      expect(
+        await vault.connect(arbitrageur).getArbitrageurMintedSynth()
+      ).to.equal(BigNumber.from(5).mul(unit));
       expect(await synth.balanceOf(arbitrageur.address)).to.equal(
         BigNumber.from(0).mul(unit)
       );
@@ -638,6 +641,9 @@ describe("#Vault", function () {
       await vault
         .connect(arbitrageur)
         .arbitrageurMintSynth({ value: BigNumber.from(50).mul(unit) });
+      expect(await vault.connect(arbitrageur).getArbitrageurMintedSynth()).to.equal(
+        BigNumber.from(5).mul(unit)
+      );
       expect(await synth.balanceOf(arbitrageur.address)).to.equal(
         BigNumber.from(5).mul(unit)
       );
