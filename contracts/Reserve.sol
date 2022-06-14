@@ -174,7 +174,11 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
     }
 
     function getNumPages() external view returns (uint) {
-        return activeAddresses.length() % uint(pageSize);
+        uint quotient = activeAddresses.length().div(pageSize);
+        if (quotient.mul(pageSize) < activeAddresses.length()) {
+            quotient += 1;
+        }
+        return quotient;
     }
 
     function getUserReserveInfo(uint pageIndex, uint256 assetPrice) external view returns (address[] memory addresses, uint256[] memory debts, uint256[] memory collateralRatios) {

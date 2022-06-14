@@ -154,7 +154,7 @@ describe("#Reserve", function () {
       ethers.utils.parseUnits("1.5", decimal),
       ethers.utils.parseUnits("1.2", decimal)
     );
-    await reserve.connect(owner).setPageSize(3);
+    await reserve.connect(owner).setPageSize(2);
     const minterDebt0 = BigNumber.from(2).mul(unit);
     const minterDebt1 = BigNumber.from(3).mul(unit);
     const minterDebt2 = BigNumber.from(4).mul(unit);
@@ -174,19 +174,18 @@ describe("#Reserve", function () {
       ]);
     }
 
-    expect(await reserve.getNumPages()).to.equal(BigNumber.from(2));
+    expect(await reserve.getNumPages()).to.equal(BigNumber.from(3));
     expect(
       await reserve.getUserReserveInfo(
         BigNumber.from(0),
         BigNumber.from(100).mul(unit)
       )
     ).to.eql([
-      [minter0.address, minter1.address, minter2.address],
-      [minterDebt0, minterDebt1, minterDebt2],
+      [minter0.address, minter1.address],
+      [minterDebt0, minterDebt1],
       [
         ethers.utils.parseUnits("2.0", decimal),
         ethers.utils.parseUnits("2.5", decimal),
-        ethers.utils.parseUnits("3.0", decimal),
       ],
     ]);
     expect(
@@ -195,12 +194,22 @@ describe("#Reserve", function () {
         BigNumber.from(100).mul(unit)
       )
     ).to.eql([
-      [minter3.address, minter4.address],
-      [minterDebt3, minterDebt4],
+      [minter2.address, minter3.address],
+      [minterDebt2, minterDebt3],
       [
+        ethers.utils.parseUnits("3.0", decimal),
         ethers.utils.parseUnits("3.5", decimal),
-        ethers.utils.parseUnits("4.0", decimal),
       ],
+    ]);
+    expect(
+      await reserve.getUserReserveInfo(
+        BigNumber.from(2),
+        BigNumber.from(100).mul(unit)
+      )
+    ).to.eql([
+      [minter4.address],
+      [minterDebt4],
+      [ethers.utils.parseUnits("4.0", decimal)],
     ]);
   });
 });
