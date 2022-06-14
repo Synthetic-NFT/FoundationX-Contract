@@ -72,7 +72,7 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
         return activeAddresses.values();
     }
 
-    function getMinCollateralRatio() public view returns (uint) {
+    function getMinCollateralRatio() public view override returns (uint) {
         return minCollateralRatio;
     }
 
@@ -84,7 +84,7 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
         return liquidationPenalty;
     }
 
-    function getMinterCollateralRatio(address minter, uint assetPrice) public view returns (uint) {
+    function getMinterCollateralRatio(address minter, uint assetPrice) public view override returns (uint) {
         return minterDepositBalanceETH[minter].divideDecimal(minterDebtBalanceETH[minter].multiplyDecimal(assetPrice));
     }
 
@@ -173,7 +173,7 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
         }
     }
 
-    function getNumPages() external view returns (uint) {
+    function getNumPages() external view override returns (uint) {
         uint quotient = activeAddresses.length().div(pageSize);
         if (quotient.mul(pageSize) < activeAddresses.length()) {
             quotient += 1;
@@ -181,7 +181,7 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
         return quotient;
     }
 
-    function getUserReserveInfo(uint pageIndex, uint256 assetPrice) external view returns (address[] memory addresses, uint256[] memory debts, uint256[] memory collateralRatios) {
+    function getUserReserveInfo(uint pageIndex, uint256 assetPrice) external view override returns (address[] memory addresses, uint256[] memory debts, uint256[] memory collateralRatios) {
         uint startIndex = pageIndex * uint(pageSize);
         require(startIndex < activeAddresses.length());
         uint resultSize256 = activeAddresses.length() - startIndex;
