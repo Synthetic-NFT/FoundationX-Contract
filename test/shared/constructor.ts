@@ -3,6 +3,7 @@ import { ethers, upgrades } from "hardhat";
 import {
   Factory,
   IOracle,
+  MockETH,
   MockNFT,
   MockOracle,
   Oracle,
@@ -35,6 +36,17 @@ export async function deployOracle(
     priceStalePeriod,
   ])) as Oracle;
   return oracle;
+}
+
+export async function deployMockETH(
+  name: string,
+  symbol: string
+): Promise<MockETH> {
+  const MockETH = await ethers.getContractFactory("MockETH");
+  return (await upgrades.deployProxy(MockETH, [
+    name,
+    symbol,
+  ])) as MockETH;
 }
 
 export async function deployReserve(
