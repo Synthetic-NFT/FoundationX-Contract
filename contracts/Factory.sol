@@ -50,9 +50,10 @@ contract Factory is AccessControlUpgradeable, UUPSUpgradeable {
         }
     }
 
-    function listUserDebtDeposit(address account, string[] calldata tokens) public view returns (uint[] memory debts, uint[] memory deposits) {
+    function listUserDebtDeposit(address account, string[] calldata tokens) public view returns (uint[] memory debts, uint[] memory deposits,  uint[][] memory depositNFTs) {
         debts = new uint[](tokens.length);
         deposits = new uint[](tokens.length);
+        depositNFTs = new uint[][](tokens.length);
         for (uint8 i = 0; i < tokens.length; i++) {
             string memory token = tokens[i];
             Vault vault = vaults[token];
@@ -60,8 +61,9 @@ contract Factory is AccessControlUpgradeable, UUPSUpgradeable {
             Reserve reserve = vault.reserve();
             debts[i] = reserve.getMinterDebtETH(account);
             deposits[i] = reserve.getMinterDepositETH(account);
+            depositNFTs[i] = reserve.getMinterDepositNFT(account);
         }
-        return (debts, deposits);
+        return (debts, deposits, depositNFTs);
     }
 
     function listTokenAddressInfo() public view returns (string[] memory tokenNames, string[] memory tokenSymbols, address[] memory vaultAddresses, address[] memory synthAddresses, address[] memory reserveAddresses) {

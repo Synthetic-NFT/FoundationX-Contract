@@ -103,11 +103,16 @@ describe("#Factory", function () {
       ownerAddress,
       BigNumber.from(300).mul(unit)
     );
+    await reserve1.addMinterDepositNFT(ownerAddress, BigNumber.from(5));
+    await reserve2.addMinterDepositNFT(ownerAddress, BigNumber.from(3));
+
+    // console.log(await reserve1.getMinterDepositNFT(ownerAddress));
     expect(
       await factory.listUserDebtDeposit(ownerAddress, [tokenName2, tokenName1])
     ).to.eql([
       [BigNumber.from(2).mul(unit), BigNumber.from(1).mul(unit)],
       [BigNumber.from(300).mul(unit), BigNumber.from(200).mul(unit)],
+      [[BigNumber.from(3)], [BigNumber.from(5)]],
     ]);
   });
 
