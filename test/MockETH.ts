@@ -17,15 +17,15 @@ describe("#MockETH", function () {
   });
 
   it("Mint", async function () {
-    await ETH.mint(owner.address, ethers.utils.parseEther("900"));
+    await ETH.mint(owner.address, ethers.utils.parseEther("9000"));
     expect(await ETH.balanceOf(owner.address)).to.equal(
-      ethers.utils.parseEther("900")
+      ethers.utils.parseEther("9000")
     );
     expect(await ETH.mintable(owner.address)).to.equal(
-      ethers.utils.parseEther("100")
+      ethers.utils.parseEther("1000")
     );
     await expect(
-      ETH.mint(owner.address, ethers.utils.parseEther("200"))
+      ETH.mint(owner.address, ethers.utils.parseEther("2000"))
     ).to.be.revertedWith(await ETH.ERR_EXCEED_MINT_LIMIT());
   });
 });
