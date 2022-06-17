@@ -136,7 +136,7 @@ contract Vault is IVault, AccessControlUpgradeable, UUPSUpgradeable, ERC721Holde
         }
     }
 
-    function userManageSynthMockETH(uint targetCollateralRatio, uint targetDeposit) external payable lock {
+    function userManageSynthMockETH(uint targetCollateralRatio, uint targetDeposit) external lock {
         uint originalDeposit = reserve.getMinterDepositETH(msg.sender);
         if (targetDeposit > originalDeposit) {
             IERC20(mockETH).transferFrom(msg.sender, address(this), targetDeposit - originalDeposit);
@@ -171,6 +171,11 @@ contract Vault is IVault, AccessControlUpgradeable, UUPSUpgradeable, ERC721Holde
     function userLiquidateETH(address account, uint synthAmount) external override payable lock {
         (uint totalRedeemed, uint amountToLiquidate) = synth.liquidateDelinquentAccount(account, synthAmount, msg.sender);
         payable(msg.sender).transfer(totalRedeemed);
+    }
+
+    function userLiquidateMockETH(address account, uint synthAmount) external lock {
+        (uint totalRedeemed, uint amountToLiquidate) = synth.liquidateDelinquentAccount(account, synthAmount, msg.sender);
+        IERC20(mockETH).transfer(msg.sender, totalRedeemed);
     }
 
     function transferERC721(address assetAddr, address to, uint256 tokenId) internal {

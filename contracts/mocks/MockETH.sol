@@ -18,7 +18,7 @@ contract MockETH is Initializable, ERC20Upgradeable, AccessControlUpgradeable, U
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     string public constant ERR_EXCEED_MINT_LIMIT = "Exceed mint limit";
-    uint public constant MINT_LIMIT = 1000 * 10**18;
+    uint public constant MINT_LIMIT = 10000 * 10**18;
 
     mapping(address => uint) tokenMinted;
 

@@ -416,6 +416,354 @@ describe("#Vault", function () {
     ).to.equal(true);
   });
 
+  describe("User mint synth sETH", async function () {
+    let minter: SignerWithAddress;
+    let minterAddress: string;
+
+    beforeEach(async function () {
+      const liquidationPenalty = ethers.utils.parseUnits("1.2", decimal);
+      const minCollateralRatio = ethers.utils.parseUnits("1.5", decimal);
+      const [_, minterSigner] = await ethers.getSigners();
+      await setUp(
+        minCollateralRatio,
+        liquidationPenalty,
+        BigNumber.from(0).mul(unit)
+      );
+      minter = minterSigner;
+      minterAddress = minter.address;
+      await Promise.all([
+        mockETH.mint(minterAddress, ethers.utils.parseEther("400")),
+        oracle.setAssetPrice(tokenName, BigNumber.from(10).mul(unit)),
+      ]);
+    });
+
+    it("Invalid", async function () {
+      await mockETH
+        .connect(minter)
+        .approve(vault.address, ethers.utils.parseEther("200"));
+      await expect(
+        vault
+          .connect(minter)
+          .userMintSynthMockETH(
+            ethers.utils.parseUnits("1.4", decimal),
+            ethers.utils.parseEther("200")
+          )
+      ).to.be.revertedWith(await vault.ERR_INVALID_TARGET_COLLATERAL_RATIO());
+    });
+
+    it("Valid", async function () {
+      const mintAndAssert = async function (
+        collateralRatio: BigNumber,
+        mintDeposit: BigNumber,
+        postDebt: BigNumber,
+        postDeposit: BigNumber
+      ) {
+        await mockETH.connect(minter).approve(vault.address, mintDeposit);
+        await vault
+          .connect(minter)
+          .userMintSynthMockETH(collateralRatio, mintDeposit);
+        expect(await mockETH.balanceOf(vault.address)).to.equal(postDeposit);
+        expect(await synth.balanceOf(minterAddress)).to.equal(postDebt);
+        expect(await reserve.getMinterDebtETH(minterAddress)).to.equal(
+          postDebt
+        );
+        expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
+          postDeposit
+        );
+      };
+
+      await mintAndAssert(
+        ethers.utils.parseUnits("1.6", decimal),
+        BigNumber.from(160).mul(unit),
+        BigNumber.from(10).mul(unit),
+        BigNumber.from(160).mul(unit)
+      );
+      await mintAndAssert(
+        ethers.utils.parseUnits("1.5", decimal),
+        BigNumber.from(150).mul(unit),
+        BigNumber.from(20).mul(unit),
+        BigNumber.from(310).mul(unit)
+      );
+    });
+  });
+
+  it("User burn synth sETH", async function () {
+    const liquidationPenalty = ethers.utils.parseUnits("1.2", decimal);
+    const minCollateralRatio = ethers.utils.parseUnits("1.5", decimal);
+    const [_, minter] = await ethers.getSigners();
+    await setUp(
+      minCollateralRatio,
+      liquidationPenalty,
+      BigNumber.from(0).mul(unit)
+    );
+    const minterAddress = minter.address;
+
+    await Promise.all([
+      mockETH.mint(minterAddress, ethers.utils.parseEther("400")),
+      oracle.setAssetPrice(tokenName, BigNumber.from(10).mul(unit)),
+    ]);
+    await mockETH
+      .connect(minter)
+      .approve(vault.address, ethers.utils.parseEther("320"));
+    await vault
+      .connect(minter)
+      .userMintSynthMockETH(
+        ethers.utils.parseUnits("1.6", decimal),
+        ethers.utils.parseEther("320")
+      );
+    await synth
+      .connect(minter)
+      .approve(vault.address, BigNumber.from(20).mul(unit));
+    await vault.connect(minter).userBurnSynthMockETH();
+
+    expect(await mockETH.balanceOf(vault.address)).to.equal(
+      BigNumber.from(0).mul(unit)
+    );
+    expect(await synth.balanceOf(minterAddress)).to.equal(
+      BigNumber.from(0).mul(unit)
+    );
+    expect(await reserve.getMinterDebtETH(minterAddress)).to.equal(
+      BigNumber.from(0).mul(unit)
+    );
+    expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
+      BigNumber.from(0).mul(unit)
+    );
+    expect(await mockETH.balanceOf(minterAddress)).to.equal(
+      BigNumber.from(400).mul(unit)
+    );
+  });
+
+  describe("User manage synth sETH", async function () {
+    let minter: SignerWithAddress;
+    let minterAddress: string;
+
+    beforeEach(async function () {
+      const liquidationPenalty = ethers.utils.parseUnits("1.2", decimal);
+      const minCollateralRatio = ethers.utils.parseUnits("1.5", decimal);
+      const [_, minterSigner] = await ethers.getSigners();
+      await setUp(
+        minCollateralRatio,
+        liquidationPenalty,
+        BigNumber.from(0).mul(unit)
+      );
+      minter = minterSigner;
+      minterAddress = minter.address;
+      await Promise.all([
+        mockETH.mint(minterAddress, ethers.utils.parseEther("400")),
+        oracle.setAssetPrice(tokenName, BigNumber.from(10).mul(unit)),
+      ]);
+    });
+
+    const assertVaultState = async function (
+      minterBalance: BigNumber,
+      vaultBalance: BigNumber,
+      minterDeposit: BigNumber,
+      minterDebt: BigNumber
+    ) {
+      expect(await mockETH.balanceOf(vault.address)).to.equal(vaultBalance);
+      expect(await synth.balanceOf(minterAddress)).to.equal(minterDebt);
+      expect(await reserve.getMinterDebtETH(minterAddress)).to.equal(
+        minterDebt
+      );
+      expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
+        minterDeposit
+      );
+      expect(await mockETH.balanceOf(minterAddress)).to.equal(minterBalance);
+    };
+
+    it("Add deposit add debt", async function () {
+      await mockETH
+        .connect(minter)
+        .approve(vault.address, ethers.utils.parseEther("160"));
+      await vault
+        .connect(minter)
+        .userMintSynthMockETH(
+          ethers.utils.parseUnits("1.6", decimal),
+          ethers.utils.parseEther("160")
+        );
+      await mockETH
+        .connect(minter)
+        .approve(vault.address, ethers.utils.parseEther("180"));
+      await vault
+        .connect(minter)
+        .userManageSynthMockETH(
+          ethers.utils.parseUnits("1.7", decimal),
+          BigNumber.from(340).mul(unit)
+        );
+      const minterBalance = BigNumber.from(60).mul(unit);
+      const minterDebt = BigNumber.from(20).mul(unit);
+      const minterDeposit = BigNumber.from(340).mul(unit);
+      await assertVaultState(
+        minterBalance,
+        minterDeposit,
+        minterDeposit,
+        minterDebt
+      );
+    });
+
+    it("Add deposit reduce debt", async function () {
+      await mockETH
+        .connect(minter)
+        .approve(vault.address, ethers.utils.parseEther("160"));
+      await vault
+        .connect(minter)
+        .userMintSynthMockETH(
+          ethers.utils.parseUnits("1.6", decimal),
+          ethers.utils.parseEther("160")
+        );
+      await synth
+        .connect(minter)
+        .approve(vault.address, BigNumber.from(1).mul(unit));
+      await mockETH
+        .connect(minter)
+        .approve(vault.address, ethers.utils.parseEther("20"));
+      await vault
+        .connect(minter)
+        .userManageSynthMockETH(
+          ethers.utils.parseUnits("2.0", decimal),
+          BigNumber.from(180).mul(unit)
+        );
+      const minterBalance = BigNumber.from(220).mul(unit);
+      const minterDebt = BigNumber.from(9).mul(unit);
+      const minterDeposit = BigNumber.from(180).mul(unit);
+      await assertVaultState(
+        minterBalance,
+        minterDeposit,
+        minterDeposit,
+        minterDebt
+      );
+    });
+
+    it("Reduce deposit add debt", async function () {
+      await mockETH
+        .connect(minter)
+        .approve(vault.address, ethers.utils.parseEther("180"));
+      await vault
+        .connect(minter)
+        .userMintSynthMockETH(
+          ethers.utils.parseUnits("2.0", decimal),
+          ethers.utils.parseEther("180")
+        );
+      await vault
+        .connect(minter)
+        .userManageSynthMockETH(
+          ethers.utils.parseUnits("1.6", decimal),
+          BigNumber.from(160).mul(unit)
+        );
+      const minterBalance = BigNumber.from(240).mul(unit);
+      const minterDebt = BigNumber.from(10).mul(unit);
+      const minterDeposit = BigNumber.from(160).mul(unit);
+      await assertVaultState(
+        minterBalance,
+        minterDeposit,
+        minterDeposit,
+        minterDebt
+      );
+    });
+
+    it("Reduce deposit reduce debt", async function () {
+      await mockETH
+        .connect(minter)
+        .approve(vault.address, ethers.utils.parseEther("240"));
+      await vault
+        .connect(minter)
+        .userMintSynthMockETH(
+          ethers.utils.parseUnits("2.0", decimal),
+          ethers.utils.parseEther("240")
+        );
+      await synth
+        .connect(minter)
+        .approve(vault.address, BigNumber.from(2).mul(unit));
+      await vault
+        .connect(minter)
+        .userManageSynthMockETH(
+          ethers.utils.parseUnits("1.6", decimal),
+          BigNumber.from(160).mul(unit)
+        );
+      const minterBalance = BigNumber.from(240).mul(unit);
+      const minterDebt = BigNumber.from(10).mul(unit);
+      const minterDeposit = BigNumber.from(160).mul(unit);
+      await assertVaultState(
+        minterBalance,
+        minterDeposit,
+        minterDeposit,
+        minterDebt
+      );
+    });
+  });
+
+  it("User liquidate sETH", async function () {
+    const liquidationPenalty = ethers.utils.parseUnits("1.2", decimal);
+    const minCollateralRatio = ethers.utils.parseUnits("1.5", decimal);
+    const [_, minter, liquidator] = await ethers.getSigners();
+    await setUp(
+      minCollateralRatio,
+      liquidationPenalty,
+      BigNumber.from(0).mul(unit)
+    );
+    const minterAddress = minter.address;
+    const liquidatorAddress = liquidator.address;
+
+    await Promise.all([
+      mockETH.mint(minterAddress, ethers.utils.parseEther("3100")),
+      mockETH.mint(liquidatorAddress, ethers.utils.parseEther("400")),
+      oracle.setAssetPrice(tokenName, BigNumber.from(60).mul(unit)),
+    ]);
+    await mockETH
+      .connect(minter)
+      .approve(vault.address, ethers.utils.parseEther("2700"));
+    await vault
+      .connect(minter)
+      .userMintSynthMockETH(
+        ethers.utils.parseUnits("2.25", decimal),
+        ethers.utils.parseEther("2700")
+      );
+    await Promise.all([
+      oracle.setAssetPrice(tokenName, BigNumber.from(100).mul(unit)),
+      synth.mint(liquidatorAddress, BigNumber.from(22).mul(unit)),
+    ]);
+    await synth
+      .connect(liquidator)
+      .approve(vault.address, BigNumber.from(21).mul(unit));
+
+    await vault
+      .connect(liquidator)
+      .userLiquidateMockETH(minterAddress, BigNumber.from(21).mul(unit));
+
+    expect(await synth.balanceOf(liquidatorAddress)).to.equal(
+      BigNumber.from(2).mul(unit)
+    );
+    expect(await synth.balanceOf(minterAddress)).to.equal(
+      BigNumber.from(20).mul(unit)
+    );
+
+    expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
+      BigNumber.from(300).mul(unit)
+    );
+    expect(await reserve.getMinterDebtETH(minterAddress)).to.equal(
+      BigNumber.from(0).mul(unit)
+    );
+
+    expect(await mockETH.balanceOf(vault.address)).to.equal(
+      BigNumber.from(300).mul(unit)
+    );
+    expect(await mockETH.balanceOf(liquidatorAddress)).to.equal(
+      ethers.utils.parseEther("2800")
+    );
+
+    // Minter redeem remaining ETH.
+    await vault.connect(minter).userBurnSynthMockETH();
+    expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
+      BigNumber.from(0).mul(unit)
+    );
+    expect(await mockETH.balanceOf(vault.address)).to.equal(
+      BigNumber.from(0).mul(unit)
+    );
+    expect(await mockETH.balanceOf(minterAddress)).to.equal(
+      ethers.utils.parseEther("700")
+    );
+  });
+
   describe("User mint synth NFT", async function () {
     let minter: SignerWithAddress;
     let minterAddress: string;
