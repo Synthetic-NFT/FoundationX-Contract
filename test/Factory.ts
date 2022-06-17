@@ -19,6 +19,13 @@ import {
   deployVault,
 } from "./shared/constructor";
 
+const {
+  BN, // Big Number support
+  constants, // Common constants, like the zero address and largest integers
+  expectEvent, // Assertions for emitted events
+  expectRevert, // Assertions for transactions that should fail
+} = require("@openzeppelin/test-helpers");
+
 describe("#Factory", function () {
   let librarySafeDecimalMath: SafeDecimalMath;
   let decimal: number;
@@ -55,6 +62,7 @@ describe("#Factory", function () {
       librarySafeDecimalMath,
       synth,
       reserve,
+      constants.ZERO_ADDRESS,
       NFTAddress,
       lockingPeriod
     );
@@ -106,7 +114,6 @@ describe("#Factory", function () {
     await reserve1.addMinterDepositNFT(ownerAddress, BigNumber.from(5));
     await reserve2.addMinterDepositNFT(ownerAddress, BigNumber.from(3));
 
-    // console.log(await reserve1.getMinterDepositNFT(ownerAddress));
     expect(
       await factory.listUserDebtDeposit(ownerAddress, [tokenName2, tokenName1])
     ).to.eql([

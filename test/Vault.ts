@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
 import {
+  MockETH,
   MockNFT,
   MockOracle,
   Reserve,
@@ -14,6 +15,7 @@ import { getEthBalance } from "./shared/address";
 import { closeBigNumber } from "./shared/math";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import {
+  deployMockETH,
   deployMockNFT,
   deployMockOracle,
   deployReserve,
@@ -26,6 +28,7 @@ describe("#Vault", function () {
   let librarySafeDecimalMath: SafeDecimalMath;
   let reserve: Reserve;
   let oracle: MockOracle;
+  let mockETH: MockETH;
   let synth: Synth;
   let NFT: MockNFT;
   let vault: Vault;
@@ -41,6 +44,7 @@ describe("#Vault", function () {
     decimal = await librarySafeDecimalMath.decimals();
     unit = await librarySafeDecimalMath.UNIT();
     oracle = await deployMockOracle();
+    mockETH = await deployMockETH("sETH", "$sETH");
   });
 
   const setUp = async function (
@@ -59,6 +63,7 @@ describe("#Vault", function () {
       librarySafeDecimalMath,
       synth,
       reserve,
+      mockETH.address,
       NFT.address,
       lockingPeriod
     );
@@ -641,9 +646,9 @@ describe("#Vault", function () {
       await vault
         .connect(arbitrageur)
         .arbitrageurMintSynth({ value: BigNumber.from(50).mul(unit) });
-      expect(await vault.connect(arbitrageur).getArbitrageurMintedSynth()).to.equal(
-        BigNumber.from(5).mul(unit)
-      );
+      expect(
+        await vault.connect(arbitrageur).getArbitrageurMintedSynth()
+      ).to.equal(BigNumber.from(5).mul(unit));
       expect(await synth.balanceOf(arbitrageur.address)).to.equal(
         BigNumber.from(5).mul(unit)
       );

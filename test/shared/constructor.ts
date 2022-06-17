@@ -102,6 +102,7 @@ export async function deployVault(
   librarySafeDecimalMath: SafeDecimalMath,
   synth: Synth,
   reserve: Reserve,
+  mockETH: string,
   NFTAddress: string,
   lockingPeriod: BigNumber
 ): Promise<Vault> {
@@ -112,7 +113,7 @@ export async function deployVault(
   });
   const vault = (await upgrades.deployProxy(
     Vault,
-    [synth.address, reserve.address, NFTAddress, lockingPeriod],
+    [synth.address, reserve.address, mockETH, NFTAddress, lockingPeriod],
     { unsafeAllowLinkedLibraries: true }
   )) as Vault;
 
