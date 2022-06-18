@@ -66,6 +66,22 @@ contract Factory is AccessControlUpgradeable, UUPSUpgradeable {
         return (debts, deposits, depositNFTs);
     }
 
+    function listUserHoldingInfo(address account, string[] calldata tokens) public view returns (uint[] memory debtETH, uint[] memory debtNFT,  uint[] memory tokenPrices) {
+        debtETH = new uint[](tokens.length);
+        debtNFT = new uint[](tokens.length);
+        tokenPrices = new uint[](tokens.length);
+        for (uint8 i = 0; i < tokens.length; i++) {
+            string memory token = tokens[i];
+            Vault vault = vaults[token];
+            require(address(vault) != address(0), ERR_SYNTH_NOT_AVAILABLE);
+            Reserve reserve = vault.reserve();
+            debtETH[i] = reserve.getMinterDebtETH(account);
+            debtNFT[i] = reserve.getMinterDebtNFT(account);
+            tokenPrices[i] = vault.synth().getSynthPriceToEth();
+        }
+        return (debtETH, debtNFT, tokenPrices);
+    }
+
     function listTokenAddressInfo() public view returns (string[] memory tokenNames, string[] memory tokenSymbols, address[] memory vaultAddresses, address[] memory synthAddresses, address[] memory reserveAddresses) {
         tokenNames = new string[](numListedTokens);
         tokenSymbols = new string[](numListedTokens);
