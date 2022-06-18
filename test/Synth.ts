@@ -159,8 +159,8 @@ describe("#Synth", function () {
           BigNumber.from(3).mul(unit),
           liquidatorAddress
         );
-      expect(totalRedeemed).to.be.equal(BigNumber.from(360).mul(unit));
-      expect(amountToLiquidate).to.be.equal(BigNumber.from(3).mul(unit));
+      expect(totalRedeemed).to.equal(BigNumber.from(360).mul(unit));
+      expect(amountToLiquidate).to.equal(BigNumber.from(3).mul(unit));
 
       await synth.liquidateDelinquentAccount(
         minterAddress,
@@ -196,8 +196,8 @@ describe("#Synth", function () {
           BigNumber.from(11).mul(unit),
           liquidatorAddress
         );
-      expect(totalRedeemed).to.be.equal(BigNumber.from(1320).mul(unit));
-      expect(amountToLiquidate).to.be.equal(BigNumber.from(11).mul(unit));
+      expect(totalRedeemed).to.equal(BigNumber.from(1320).mul(unit));
+      expect(amountToLiquidate).to.equal(BigNumber.from(11).mul(unit));
 
       await synth.liquidateDelinquentAccount(
         minterAddress,
@@ -233,8 +233,8 @@ describe("#Synth", function () {
           BigNumber.from(11).mul(unit),
           liquidatorAddress
         );
-      expect(totalRedeemed).to.be.equal(BigNumber.from(1150).mul(unit));
-      expect(amountToLiquidate).to.be.equal(BigNumber.from(10).mul(unit));
+      expect(totalRedeemed).to.equal(BigNumber.from(1150).mul(unit));
+      expect(amountToLiquidate).to.equal(BigNumber.from(10).mul(unit));
 
       await synth.liquidateDelinquentAccount(
         minterAddress,
@@ -270,8 +270,8 @@ describe("#Synth", function () {
           BigNumber.from(11).mul(unit),
           liquidatorAddress
         );
-      expect(totalRedeemed).to.be.equal(BigNumber.from(1200).mul(unit));
-      expect(amountToLiquidate).to.be.equal(BigNumber.from(10).mul(unit));
+      expect(totalRedeemed).to.equal(BigNumber.from(1200).mul(unit));
+      expect(amountToLiquidate).to.equal(BigNumber.from(10).mul(unit));
 
       await synth.liquidateDelinquentAccount(
         minterAddress,

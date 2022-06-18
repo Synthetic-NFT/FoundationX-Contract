@@ -12,7 +12,6 @@ import {
 import { beforeEach, describe, it } from "mocha";
 import { BigNumber } from "ethers";
 import { getEthBalance } from "./shared/address";
-import { closeBigNumber } from "./shared/math";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import {
   deployMockNFT,
@@ -182,13 +181,10 @@ describe("#Vault", function () {
     expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
       BigNumber.from(0).mul(unit)
     );
-    expect(
-      closeBigNumber(
-        await getEthBalance(minterAddress),
-        BigNumber.from(400).mul(unit),
-        ethers.utils.parseUnits("0.01", decimal)
-      )
-    ).to.equal(true);
+    expect(await getEthBalance(minterAddress)).to.closeTo(
+      ethers.utils.parseEther("400"),
+      ethers.utils.parseEther("0.01")
+    );
   });
 
   describe("User manage synth ETH", async function () {
@@ -226,13 +222,10 @@ describe("#Vault", function () {
       expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
         minterDeposit
       );
-      expect(
-        closeBigNumber(
-          minterBalance,
-          await getEthBalance(minterAddress),
-          ethers.utils.parseUnits("0.001", decimal)
-        )
-      ).to.equal(true);
+      expect(await getEthBalance(minterAddress)).to.closeTo(
+        minterBalance,
+        ethers.utils.parseEther("0.001")
+      );
     };
 
     it("Add deposit add debt", async function () {
@@ -391,13 +384,10 @@ describe("#Vault", function () {
     expect(await WETH.balanceOf(vault.address)).to.equal(
       BigNumber.from(300).mul(unit)
     );
-    expect(
-      closeBigNumber(
-        await getEthBalance(liquidatorAddress),
-        BigNumber.from(2800).mul(unit),
-        ethers.utils.parseUnits("0.001", decimal)
-      )
-    ).to.equal(true);
+    expect(await getEthBalance(liquidatorAddress)).to.closeTo(
+      ethers.utils.parseEther("2800"),
+      ethers.utils.parseEther("0.001")
+    );
 
     // Minter redeem remaining ETH.
     await vault.connect(minter).userBurnSynthETH();
@@ -407,13 +397,10 @@ describe("#Vault", function () {
     expect(await WETH.balanceOf(vault.address)).to.equal(
       BigNumber.from(0).mul(unit)
     );
-    expect(
-      closeBigNumber(
-        await getEthBalance(minterAddress),
-        BigNumber.from(700).mul(unit),
-        ethers.utils.parseUnits("0.001", decimal)
-      )
-    ).to.equal(true);
+    expect(await getEthBalance(minterAddress)).to.closeTo(
+      ethers.utils.parseEther("700"),
+      ethers.utils.parseEther("0.001")
+    );
   });
 
   describe("User mint synth WETH", async function () {
@@ -808,27 +795,25 @@ describe("#Vault", function () {
 
       await vault.connect(minter).userMintSynthNFT(depositedNFTs);
       for (const depositedNFT of depositedNFTs) {
-        expect(await NFT.ownerOf(depositedNFT)).to.be.equal(vault.address);
-        expect(await vault.NFTDepositer(depositedNFT)).to.be.equal(
-          minterAddress
-        );
+        expect(await NFT.ownerOf(depositedNFT)).to.equal(vault.address);
+        expect(await vault.NFTDepositer(depositedNFT)).to.equal(minterAddress);
       }
-      expect(await synth.totalSupply()).to.be.equal(
+      expect(await synth.totalSupply()).to.equal(
         BigNumber.from(depositedNFTs.length).mul(unit)
       );
-      expect(await synth.balanceOf(minterAddress)).to.be.equal(
+      expect(await synth.balanceOf(minterAddress)).to.equal(
         BigNumber.from(depositedNFTs.length).mul(unit)
       );
-      expect(await reserve.getMinterDebtNFT(minterAddress)).to.be.eql(
+      expect(await reserve.getMinterDebtNFT(minterAddress)).to.eql(
         BigNumber.from(depositedNFTs.length).mul(unit)
       );
-      expect(await reserve.getMinterDepositNFT(minterAddress)).to.be.eql(
+      expect(await reserve.getMinterDepositNFT(minterAddress)).to.eql(
         depositedNFTs
       );
-      expect(await reserve.getMinterDebtETH(minterAddress)).to.be.equal(
+      expect(await reserve.getMinterDebtETH(minterAddress)).to.equal(
         BigNumber.from(0).mul(unit)
       );
-      expect(await reserve.getMinterDepositETH(minterAddress)).to.be.equal(
+      expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
         BigNumber.from(0).mul(unit)
       );
 
@@ -876,22 +861,20 @@ describe("#Vault", function () {
         .connect(minter)
         .approve(vault.address, BigNumber.from(1).mul(unit));
       await vault.connect(minter).userBurnSynthNFT([BigNumber.from(0)]);
-      expect(await synth.totalSupply()).to.be.equal(
+      expect(await synth.totalSupply()).to.equal(BigNumber.from(1).mul(unit));
+      expect(await synth.balanceOf(minterAddress)).to.equal(
         BigNumber.from(1).mul(unit)
       );
-      expect(await synth.balanceOf(minterAddress)).to.be.equal(
+      expect(await reserve.getMinterDebtNFT(minterAddress)).to.eql(
         BigNumber.from(1).mul(unit)
       );
-      expect(await reserve.getMinterDebtNFT(minterAddress)).to.be.eql(
-        BigNumber.from(1).mul(unit)
-      );
-      expect(await reserve.getMinterDepositNFT(minterAddress)).to.be.eql([
+      expect(await reserve.getMinterDepositNFT(minterAddress)).to.eql([
         BigNumber.from(1),
       ]);
-      expect(await reserve.getMinterDebtETH(minterAddress)).to.be.equal(
+      expect(await reserve.getMinterDebtETH(minterAddress)).to.equal(
         BigNumber.from(0).mul(unit)
       );
-      expect(await reserve.getMinterDepositETH(minterAddress)).to.be.equal(
+      expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
         BigNumber.from(0).mul(unit)
       );
     });
@@ -913,22 +896,20 @@ describe("#Vault", function () {
         mintBlockTimestamp + lockingPeriod + 1,
       ]);
       await vault.connect(burner).userBurnSynthNFT([BigNumber.from(0)]);
-      expect(await synth.totalSupply()).to.be.equal(
+      expect(await synth.totalSupply()).to.equal(BigNumber.from(1).mul(unit));
+      expect(await synth.balanceOf(minterAddress)).to.equal(
         BigNumber.from(1).mul(unit)
       );
-      expect(await synth.balanceOf(minterAddress)).to.be.equal(
+      expect(await reserve.getMinterDebtNFT(minterAddress)).to.equal(
         BigNumber.from(1).mul(unit)
       );
-      expect(await reserve.getMinterDebtNFT(minterAddress)).to.be.equal(
-        BigNumber.from(1).mul(unit)
-      );
-      expect(await reserve.getMinterDepositNFT(minterAddress)).to.be.eql([
+      expect(await reserve.getMinterDepositNFT(minterAddress)).to.eql([
         BigNumber.from(1),
       ]);
-      expect(await synth.balanceOf(burnerAddress)).to.be.equal(
+      expect(await synth.balanceOf(burnerAddress)).to.equal(
         BigNumber.from(0).mul(unit)
       );
-      expect(await NFT.ownerOf(BigNumber.from(0))).to.be.equal(burnerAddress);
+      expect(await NFT.ownerOf(BigNumber.from(0))).to.equal(burnerAddress);
     });
   });
 
@@ -973,13 +954,10 @@ describe("#Vault", function () {
       expect(await synth.balanceOf(arbitrageur.address)).to.equal(
         BigNumber.from(0).mul(unit)
       );
-      expect(
-        closeBigNumber(
-          await getEthBalance(arbitrageur.address),
-          BigNumber.from(350).mul(unit),
-          ethers.utils.parseUnits("0.001", decimal)
-        )
-      ).to.equal(true);
+      expect(await getEthBalance(arbitrageur.address)).to.closeTo(
+        ethers.utils.parseEther("350"),
+        ethers.utils.parseEther("0.001")
+      );
       expect(await reserve.getMinterDebtETH(minter.address)).to.equal(
         BigNumber.from(20).mul(unit)
       );
@@ -1015,13 +993,10 @@ describe("#Vault", function () {
       expect(await reserve.getMinterDebtETH(arbitrageur.address)).to.equal(
         BigNumber.from(0).mul(unit)
       );
-      expect(
-        closeBigNumber(
-          await getEthBalance(arbitrageur.address),
-          BigNumber.from(300).mul(unit),
-          ethers.utils.parseUnits("0.001", decimal)
-        )
-      ).to.equal(true);
+      expect(await getEthBalance(arbitrageur.address)).to.closeTo(
+        ethers.utils.parseEther("300"),
+        ethers.utils.parseEther("0.001")
+      );
     });
   });
 });

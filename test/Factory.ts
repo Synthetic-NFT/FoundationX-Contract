@@ -124,7 +124,7 @@ describe("#Factory", function () {
   });
 
   it("List token address info", async function () {
-    expect(await factory.listTokenAddressInfo()).to.be.eql([
+    expect(await factory.listTokenAddressInfo()).to.eql([
       [tokenName1, tokenName2],
       [tokenSymbol1, tokenSymbol2],
       [vault1.address, vault2.address],
@@ -132,7 +132,7 @@ describe("#Factory", function () {
       [reserve1.address, reserve2.address],
     ]);
     await factory.delistVaults([tokenName1]);
-    expect(await factory.listTokenAddressInfo()).to.be.eql([
+    expect(await factory.listTokenAddressInfo()).to.eql([
       [tokenName2],
       [tokenSymbol2],
       [vault2.address],
