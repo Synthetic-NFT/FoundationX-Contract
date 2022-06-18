@@ -6,8 +6,8 @@
 import { BigNumber } from "ethers";
 import {
   deployFactory,
-  deployMockETH,
   deployMockNFT,
+  deployMockWETH,
   deployOracle,
   deployReserve,
   deploySafeDecimalMath,
@@ -43,8 +43,8 @@ async function main() {
   const oracle = await deployOracle(owner.address, priceStalePeriod);
   console.log("Oracle deployed to:", oracle.address);
 
-  const mockETH = await deployMockETH("sETH", "$sETH");
-  console.log("MockETH deployed to:", mockETH.address);
+  const mockWETH = await deployMockWETH("WETH", "WETH");
+  console.log("MockWETH deployed to:", mockWETH.address);
 
   const vaults: Array<string> = [];
   for (let i = 0; i < tokenNames.length; i++) {
@@ -68,7 +68,7 @@ async function main() {
       safeDecimalMath,
       synth,
       reserve,
-      mockETH.address,
+      mockWETH.address,
       NFT.address,
       BigNumber.from(0).mul(unit)
     );

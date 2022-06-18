@@ -3,9 +3,9 @@ import { ethers, upgrades } from "hardhat";
 import {
   Factory,
   IOracle,
-  MockETH,
   MockNFT,
   MockOracle,
+  MockWETH,
   Oracle,
   Reserve,
   SafeDecimalMath,
@@ -38,15 +38,12 @@ export async function deployOracle(
   return oracle;
 }
 
-export async function deployMockETH(
+export async function deployMockWETH(
   name: string,
   symbol: string
-): Promise<MockETH> {
-  const MockETH = await ethers.getContractFactory("MockETH");
-  return (await upgrades.deployProxy(MockETH, [
-    name,
-    symbol,
-  ])) as MockETH;
+): Promise<MockWETH> {
+  const MockWETH = await ethers.getContractFactory("MockWETH");
+  return (await upgrades.deployProxy(MockWETH, [name, symbol])) as MockWETH;
 }
 
 export async function deployReserve(
@@ -102,7 +99,7 @@ export async function deployVault(
   librarySafeDecimalMath: SafeDecimalMath,
   synth: Synth,
   reserve: Reserve,
-  mockETH: string,
+  WETH: string,
   NFTAddress: string,
   lockingPeriod: BigNumber
 ): Promise<Vault> {
@@ -113,7 +110,7 @@ export async function deployVault(
   });
   const vault = (await upgrades.deployProxy(
     Vault,
-    [synth.address, reserve.address, mockETH, NFTAddress, lockingPeriod],
+    [synth.address, reserve.address, WETH, NFTAddress, lockingPeriod],
     { unsafeAllowLinkedLibraries: true }
   )) as Vault;
 

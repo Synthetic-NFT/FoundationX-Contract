@@ -4,12 +4,12 @@ pragma solidity ^0.8.4;
 import "./Synth.sol";
 import "./Reserve.sol";
 import "./interfaces/IVault.sol";
+import "./interfaces/IWETH.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/IERC721Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/utils/ERC721HolderUpgradeable.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./libraries/SafeDecimalMath.sol";
 import "hardhat/console.sol";
 
@@ -23,7 +23,7 @@ contract Vault is IVault, AccessControlUpgradeable, UUPSUpgradeable, ERC721Holde
 
     Synth public synth;
     Reserve public reserve;
-    address mockETH;
+    address WETHAddress;
     uint arbitrageurBurnedSynth;
 
     address public NFTAddress;
@@ -49,7 +49,7 @@ contract Vault is IVault, AccessControlUpgradeable, UUPSUpgradeable, ERC721Holde
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-    function initialize(Synth _synth, Reserve _reserve, address _mockETH, address _NFTAddress, uint _lockingPeriod) initializer public {
+    function initialize(Synth _synth, Reserve _reserve, address _WETHADDRESS, address _NFTAddress, uint _lockingPeriod) initializer public {
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
@@ -57,8 +57,8 @@ contract Vault is IVault, AccessControlUpgradeable, UUPSUpgradeable, ERC721Holde
         _grantRole(ARBITRAGEUR_ROLE, msg.sender);
         synth = _synth;
         reserve = _reserve;
+        WETHAddress = _WETHADDRESS;
         NFTAddress = _NFTAddress;
-        mockETH = _mockETH;
         lockingPeriod = _lockingPeriod;
         locked = false;
     }
@@ -99,14 +99,18 @@ contract Vault is IVault, AccessControlUpgradeable, UUPSUpgradeable, ERC721Holde
     }
 
     function userMintSynthETH(uint targetCollateralRatio) external payable lock {
-        checkTargetCollateralRatio(targetCollateralRatio);
+        IWETH(WETHAddress).deposit{value: msg.value}();
         reserve.addMinterDepositETH(msg.sender, msg.value);
         synth.mintWithETH(msg.sender, msg.value.divideDecimal(targetCollateralRatio.multiplyDecimal(synth.getSynthPriceToEth())));
     }
 
-    function userMintSynthMockETH(uint targetCollateralRatio, uint targetDeposit) external lock {
+    function userMintSynthWETH(uint targetCollateralRatio, uint targetDeposit) external lock {
+        IWETH(WETHAddress).transferFrom(msg.sender, address(this), targetDeposit);
+        internalUserMintSynth(targetCollateralRatio, targetDeposit);
+    }
+
+    function internalUserMintSynth(uint targetCollateralRatio, uint targetDeposit) internal lock {
         checkTargetCollateralRatio(targetCollateralRatio);
-        IERC20(mockETH).transferFrom(msg.sender, address(this), targetDeposit);
         reserve.addMinterDepositETH(msg.sender, targetDeposit);
         synth.mintWithETH(msg.sender, targetDeposit.divideDecimal(targetCollateralRatio.multiplyDecimal(synth.getSynthPriceToEth())));
     }
@@ -114,14 +118,15 @@ contract Vault is IVault, AccessControlUpgradeable, UUPSUpgradeable, ERC721Holde
     function userBurnSynthETH() external lock {
         uint redeemAmount = internalUserManageSynthETH(reserve.getMinCollateralRatio(), 0);
         if (redeemAmount > 0) {
+            IWETH(WETHAddress).withdraw(redeemAmount);
             payable(msg.sender).transfer(redeemAmount);
         }
     }
 
-    function userBurnSynthMockETH() external lock {
+    function userBurnSynthWETH() external lock {
         uint redeemAmount = internalUserManageSynthETH(reserve.getMinCollateralRatio(), 0);
         if (redeemAmount > 0) {
-            IERC20(mockETH).transfer(msg.sender, redeemAmount);
+            IWETH(WETHAddress).transfer(msg.sender, redeemAmount);
         }
     }
 
@@ -136,14 +141,14 @@ contract Vault is IVault, AccessControlUpgradeable, UUPSUpgradeable, ERC721Holde
         }
     }
 
-    function userManageSynthMockETH(uint targetCollateralRatio, uint targetDeposit) external lock {
+    function userManageSynthWETH(uint targetCollateralRatio, uint targetDeposit) external lock {
         uint originalDeposit = reserve.getMinterDepositETH(msg.sender);
         if (targetDeposit > originalDeposit) {
-            IERC20(mockETH).transferFrom(msg.sender, address(this), targetDeposit - originalDeposit);
+            IWETH(WETHAddress).transferFrom(msg.sender, address(this), targetDeposit - originalDeposit);
         }
         uint redeemAmount = internalUserManageSynthETH(targetCollateralRatio, targetDeposit);
         if (redeemAmount > 0) {
-            IERC20(mockETH).transfer(msg.sender, redeemAmount);
+            IWETH(WETHAddress).transfer(msg.sender, redeemAmount);
         }
     }
 
@@ -170,12 +175,13 @@ contract Vault is IVault, AccessControlUpgradeable, UUPSUpgradeable, ERC721Holde
 
     function userLiquidateETH(address account, uint synthAmount) external override payable lock {
         (uint totalRedeemed, uint amountToLiquidate) = synth.liquidateDelinquentAccount(account, synthAmount, msg.sender);
+        IWETH(WETHAddress).withdraw(totalRedeemed);
         payable(msg.sender).transfer(totalRedeemed);
     }
 
-    function userLiquidateMockETH(address account, uint synthAmount) external lock {
+    function userLiquidateWETH(address account, uint synthAmount) external lock {
         (uint totalRedeemed, uint amountToLiquidate) = synth.liquidateDelinquentAccount(account, synthAmount, msg.sender);
-        IERC20(mockETH).transfer(msg.sender, totalRedeemed);
+        IWETH(WETHAddress).transfer(msg.sender, totalRedeemed);
     }
 
     function transferERC721(address assetAddr, address to, uint256 tokenId) internal {

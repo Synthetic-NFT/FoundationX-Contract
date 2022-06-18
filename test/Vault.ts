@@ -1,9 +1,9 @@
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
 import {
-  MockETH,
   MockNFT,
   MockOracle,
+  MockWETH,
   Reserve,
   SafeDecimalMath,
   Synth,
@@ -15,9 +15,9 @@ import { getEthBalance } from "./shared/address";
 import { closeBigNumber } from "./shared/math";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import {
-  deployMockETH,
   deployMockNFT,
   deployMockOracle,
+  deployMockWETH,
   deployReserve,
   deploySafeDecimalMath,
   deploySynth,
@@ -28,7 +28,7 @@ describe("#Vault", function () {
   let librarySafeDecimalMath: SafeDecimalMath;
   let reserve: Reserve;
   let oracle: MockOracle;
-  let mockETH: MockETH;
+  let WETH: MockWETH;
   let synth: Synth;
   let NFT: MockNFT;
   let vault: Vault;
@@ -44,7 +44,7 @@ describe("#Vault", function () {
     decimal = await librarySafeDecimalMath.decimals();
     unit = await librarySafeDecimalMath.UNIT();
     oracle = await deployMockOracle();
-    mockETH = await deployMockETH("sETH", "$sETH");
+    WETH = await deployMockWETH("WETH", "WETH");
   });
 
   const setUp = async function (
@@ -63,7 +63,7 @@ describe("#Vault", function () {
       librarySafeDecimalMath,
       synth,
       reserve,
-      mockETH.address,
+      WETH.address,
       NFT.address,
       lockingPeriod
     );
@@ -432,19 +432,20 @@ describe("#Vault", function () {
       minter = minterSigner;
       minterAddress = minter.address;
       await Promise.all([
-        mockETH.mint(minterAddress, ethers.utils.parseEther("400")),
+        WETH.mintFree(minterAddress, ethers.utils.parseEther("400")),
         oracle.setAssetPrice(tokenName, BigNumber.from(10).mul(unit)),
       ]);
     });
 
     it("Invalid", async function () {
-      await mockETH
-        .connect(minter)
-        .approve(vault.address, ethers.utils.parseEther("200"));
+      await WETH.connect(minter).approve(
+        vault.address,
+        ethers.utils.parseEther("200")
+      );
       await expect(
         vault
           .connect(minter)
-          .userMintSynthMockETH(
+          .userMintSynthWETH(
             ethers.utils.parseUnits("1.4", decimal),
             ethers.utils.parseEther("200")
           )
@@ -458,11 +459,11 @@ describe("#Vault", function () {
         postDebt: BigNumber,
         postDeposit: BigNumber
       ) {
-        await mockETH.connect(minter).approve(vault.address, mintDeposit);
+        await WETH.connect(minter).approve(vault.address, mintDeposit);
         await vault
           .connect(minter)
-          .userMintSynthMockETH(collateralRatio, mintDeposit);
-        expect(await mockETH.balanceOf(vault.address)).to.equal(postDeposit);
+          .userMintSynthWETH(collateralRatio, mintDeposit);
+        expect(await WETH.balanceOf(vault.address)).to.equal(postDeposit);
         expect(await synth.balanceOf(minterAddress)).to.equal(postDebt);
         expect(await reserve.getMinterDebtETH(minterAddress)).to.equal(
           postDebt
@@ -499,24 +500,25 @@ describe("#Vault", function () {
     const minterAddress = minter.address;
 
     await Promise.all([
-      mockETH.mint(minterAddress, ethers.utils.parseEther("400")),
+      WETH.mintFree(minterAddress, ethers.utils.parseEther("400")),
       oracle.setAssetPrice(tokenName, BigNumber.from(10).mul(unit)),
     ]);
-    await mockETH
-      .connect(minter)
-      .approve(vault.address, ethers.utils.parseEther("320"));
+    await WETH.connect(minter).approve(
+      vault.address,
+      ethers.utils.parseEther("320")
+    );
     await vault
       .connect(minter)
-      .userMintSynthMockETH(
+      .userMintSynthWETH(
         ethers.utils.parseUnits("1.6", decimal),
         ethers.utils.parseEther("320")
       );
     await synth
       .connect(minter)
       .approve(vault.address, BigNumber.from(20).mul(unit));
-    await vault.connect(minter).userBurnSynthMockETH();
+    await vault.connect(minter).userBurnSynthWETH();
 
-    expect(await mockETH.balanceOf(vault.address)).to.equal(
+    expect(await WETH.balanceOf(vault.address)).to.equal(
       BigNumber.from(0).mul(unit)
     );
     expect(await synth.balanceOf(minterAddress)).to.equal(
@@ -528,7 +530,7 @@ describe("#Vault", function () {
     expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
       BigNumber.from(0).mul(unit)
     );
-    expect(await mockETH.balanceOf(minterAddress)).to.equal(
+    expect(await WETH.balanceOf(minterAddress)).to.equal(
       BigNumber.from(400).mul(unit)
     );
   });
@@ -549,7 +551,7 @@ describe("#Vault", function () {
       minter = minterSigner;
       minterAddress = minter.address;
       await Promise.all([
-        mockETH.mint(minterAddress, ethers.utils.parseEther("400")),
+        WETH.mintFree(minterAddress, ethers.utils.parseEther("400")),
         oracle.setAssetPrice(tokenName, BigNumber.from(10).mul(unit)),
       ]);
     });
@@ -560,7 +562,7 @@ describe("#Vault", function () {
       minterDeposit: BigNumber,
       minterDebt: BigNumber
     ) {
-      expect(await mockETH.balanceOf(vault.address)).to.equal(vaultBalance);
+      expect(await WETH.balanceOf(vault.address)).to.equal(vaultBalance);
       expect(await synth.balanceOf(minterAddress)).to.equal(minterDebt);
       expect(await reserve.getMinterDebtETH(minterAddress)).to.equal(
         minterDebt
@@ -568,25 +570,27 @@ describe("#Vault", function () {
       expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
         minterDeposit
       );
-      expect(await mockETH.balanceOf(minterAddress)).to.equal(minterBalance);
+      expect(await WETH.balanceOf(minterAddress)).to.equal(minterBalance);
     };
 
     it("Add deposit add debt", async function () {
-      await mockETH
-        .connect(minter)
-        .approve(vault.address, ethers.utils.parseEther("160"));
+      await WETH.connect(minter).approve(
+        vault.address,
+        ethers.utils.parseEther("160")
+      );
       await vault
         .connect(minter)
-        .userMintSynthMockETH(
+        .userMintSynthWETH(
           ethers.utils.parseUnits("1.6", decimal),
           ethers.utils.parseEther("160")
         );
-      await mockETH
-        .connect(minter)
-        .approve(vault.address, ethers.utils.parseEther("180"));
+      await WETH.connect(minter).approve(
+        vault.address,
+        ethers.utils.parseEther("180")
+      );
       await vault
         .connect(minter)
-        .userManageSynthMockETH(
+        .userManageSynthWETH(
           ethers.utils.parseUnits("1.7", decimal),
           BigNumber.from(340).mul(unit)
         );
@@ -602,24 +606,26 @@ describe("#Vault", function () {
     });
 
     it("Add deposit reduce debt", async function () {
-      await mockETH
-        .connect(minter)
-        .approve(vault.address, ethers.utils.parseEther("160"));
+      await WETH.connect(minter).approve(
+        vault.address,
+        ethers.utils.parseEther("160")
+      );
       await vault
         .connect(minter)
-        .userMintSynthMockETH(
+        .userMintSynthWETH(
           ethers.utils.parseUnits("1.6", decimal),
           ethers.utils.parseEther("160")
         );
       await synth
         .connect(minter)
         .approve(vault.address, BigNumber.from(1).mul(unit));
-      await mockETH
-        .connect(minter)
-        .approve(vault.address, ethers.utils.parseEther("20"));
+      await WETH.connect(minter).approve(
+        vault.address,
+        ethers.utils.parseEther("20")
+      );
       await vault
         .connect(minter)
-        .userManageSynthMockETH(
+        .userManageSynthWETH(
           ethers.utils.parseUnits("2.0", decimal),
           BigNumber.from(180).mul(unit)
         );
@@ -635,18 +641,19 @@ describe("#Vault", function () {
     });
 
     it("Reduce deposit add debt", async function () {
-      await mockETH
-        .connect(minter)
-        .approve(vault.address, ethers.utils.parseEther("180"));
+      await WETH.connect(minter).approve(
+        vault.address,
+        ethers.utils.parseEther("180")
+      );
       await vault
         .connect(minter)
-        .userMintSynthMockETH(
+        .userMintSynthWETH(
           ethers.utils.parseUnits("2.0", decimal),
           ethers.utils.parseEther("180")
         );
       await vault
         .connect(minter)
-        .userManageSynthMockETH(
+        .userManageSynthWETH(
           ethers.utils.parseUnits("1.6", decimal),
           BigNumber.from(160).mul(unit)
         );
@@ -662,12 +669,13 @@ describe("#Vault", function () {
     });
 
     it("Reduce deposit reduce debt", async function () {
-      await mockETH
-        .connect(minter)
-        .approve(vault.address, ethers.utils.parseEther("240"));
+      await WETH.connect(minter).approve(
+        vault.address,
+        ethers.utils.parseEther("240")
+      );
       await vault
         .connect(minter)
-        .userMintSynthMockETH(
+        .userMintSynthWETH(
           ethers.utils.parseUnits("2.0", decimal),
           ethers.utils.parseEther("240")
         );
@@ -676,7 +684,7 @@ describe("#Vault", function () {
         .approve(vault.address, BigNumber.from(2).mul(unit));
       await vault
         .connect(minter)
-        .userManageSynthMockETH(
+        .userManageSynthWETH(
           ethers.utils.parseUnits("1.6", decimal),
           BigNumber.from(160).mul(unit)
         );
@@ -705,16 +713,17 @@ describe("#Vault", function () {
     const liquidatorAddress = liquidator.address;
 
     await Promise.all([
-      mockETH.mint(minterAddress, ethers.utils.parseEther("3100")),
-      mockETH.mint(liquidatorAddress, ethers.utils.parseEther("400")),
+      WETH.mintFree(minterAddress, ethers.utils.parseEther("3100")),
+      WETH.mintFree(liquidatorAddress, ethers.utils.parseEther("400")),
       oracle.setAssetPrice(tokenName, BigNumber.from(60).mul(unit)),
     ]);
-    await mockETH
-      .connect(minter)
-      .approve(vault.address, ethers.utils.parseEther("2700"));
+    await WETH.connect(minter).approve(
+      vault.address,
+      ethers.utils.parseEther("2700")
+    );
     await vault
       .connect(minter)
-      .userMintSynthMockETH(
+      .userMintSynthWETH(
         ethers.utils.parseUnits("2.25", decimal),
         ethers.utils.parseEther("2700")
       );
@@ -728,7 +737,7 @@ describe("#Vault", function () {
 
     await vault
       .connect(liquidator)
-      .userLiquidateMockETH(minterAddress, BigNumber.from(21).mul(unit));
+      .userLiquidateWETH(minterAddress, BigNumber.from(21).mul(unit));
 
     expect(await synth.balanceOf(liquidatorAddress)).to.equal(
       BigNumber.from(2).mul(unit)
@@ -744,22 +753,22 @@ describe("#Vault", function () {
       BigNumber.from(0).mul(unit)
     );
 
-    expect(await mockETH.balanceOf(vault.address)).to.equal(
+    expect(await WETH.balanceOf(vault.address)).to.equal(
       BigNumber.from(300).mul(unit)
     );
-    expect(await mockETH.balanceOf(liquidatorAddress)).to.equal(
+    expect(await WETH.balanceOf(liquidatorAddress)).to.equal(
       ethers.utils.parseEther("2800")
     );
 
     // Minter redeem remaining ETH.
-    await vault.connect(minter).userBurnSynthMockETH();
+    await vault.connect(minter).userBurnSynthWETH();
     expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
       BigNumber.from(0).mul(unit)
     );
-    expect(await mockETH.balanceOf(vault.address)).to.equal(
+    expect(await WETH.balanceOf(vault.address)).to.equal(
       BigNumber.from(0).mul(unit)
     );
-    expect(await mockETH.balanceOf(minterAddress)).to.equal(
+    expect(await WETH.balanceOf(minterAddress)).to.equal(
       ethers.utils.parseEther("700")
     );
   });
