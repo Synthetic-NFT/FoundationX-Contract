@@ -184,14 +184,14 @@ contract Reserve is IReserve, AccessControlUpgradeable, UUPSUpgradeable {
     function getUserReserveInfo(uint pageIndex, uint256 assetPrice) external view override returns (address[] memory addresses, uint256[] memory debts, uint256[] memory collateralRatios) {
         uint startIndex = pageIndex * uint(pageSize);
         require(startIndex < activeAddresses.length());
-        uint resultSize256 = activeAddresses.length() - startIndex;
-        uint16 resultSize = resultSize256 < uint256(pageSize) ? uint16(resultSize256) : pageSize;
+        uint resultSize = activeAddresses.length() - startIndex;
+        resultSize = resultSize < uint (pageSize) ? resultSize : uint (pageSize);
         addresses = new address[](resultSize);
         debts = new uint256[](resultSize);
         collateralRatios = new uint256[](resultSize);
 
-        for (uint16 i = 0; i < resultSize; i++) {
-            address minterAddress = activeAddresses.at(pageIndex * pageSize + i);
+        for (uint i = 0; i < resultSize; i++) {
+            address minterAddress = activeAddresses.at(startIndex + i);
             addresses[i] = minterAddress;
             debts[i] = minterDebtBalanceETH[minterAddress];
             collateralRatios[i] = getMinterCollateralRatio(minterAddress, assetPrice);

@@ -777,12 +777,12 @@ describe("#Vault", function () {
       const [_, minterSigner] = await ethers.getSigners();
       minter = minterSigner;
       minterAddress = minter.address;
-      await NFT.mint(minterAddress, BigNumber.from(0));
-      await NFT.mint(minterAddress, BigNumber.from(1));
+      await NFT.safeMint(minterAddress, BigNumber.from(0));
+      await NFT.safeMint(minterAddress, BigNumber.from(1));
     });
 
     it("Not NFT owner", async function () {
-      await NFT.mint(vault.address, BigNumber.from(2));
+      await NFT.safeMint(vault.address, BigNumber.from(2));
       await expect(
         vault.connect(minter).userMintSynthNFT([BigNumber.from(2)])
       ).to.be.revertedWith(await vault.ERR_NOT_NFT_OWNER());
@@ -849,7 +849,7 @@ describe("#Vault", function () {
 
       const depositedNFTs = [BigNumber.from(0), BigNumber.from(1)];
       for (const depositedNFT of depositedNFTs) {
-        await NFT.mint(minterAddress, depositedNFT);
+        await NFT.safeMint(minterAddress, depositedNFT);
         await NFT.connect(minter).approve(vault.address, depositedNFT);
       }
       await vault.connect(minter).userMintSynthNFT(depositedNFTs);

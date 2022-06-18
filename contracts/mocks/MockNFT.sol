@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
@@ -13,12 +14,16 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
  * This mock just provides a public safeMint, mint, and burn functions for testing purposes
  */
 contract MockNFT is Initializable, AccessControlUpgradeable, ERC721EnumerableUpgradeable {
+    using SafeMath for uint;
     using EnumerableMap for EnumerableMap.UintToAddressMap;
     using EnumerableSet for EnumerableSet.UintSet;
 
     mapping(uint => string) private tokenURIs;
     // Remaining token IDs that can be minted.
     EnumerableSet.UintSet remainingTokenIds;
+
+    uint16 constant DEFAULT_PAGE_SIZE = 100;
+    uint16 public pageSize;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
@@ -30,27 +35,24 @@ contract MockNFT is Initializable, AccessControlUpgradeable, ERC721EnumerableUpg
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         __ERC721_init_unchained(_tokenName, _tokenSymbol);
+        setPageSize(DEFAULT_PAGE_SIZE);
     }
 
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721EnumerableUpgradeable, AccessControlUpgradeable) returns (bool) {
         return ERC721EnumerableUpgradeable.supportsInterface(interfaceId) || AccessControlUpgradeable.supportsInterface(interfaceId);
     }
 
-    function exists(uint256 tokenId) public view returns (bool) {
-        return _exists(tokenId);
+    function setPageSize(uint16 _pageSize) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        pageSize = _pageSize;
     }
 
-    function mint(address to, uint256 tokenId) public {
-        _mint(to, tokenId);
+    function exists(uint256 tokenId) public view returns (bool) {
+        return _exists(tokenId);
     }
 
     function safeMint(address to, uint256 tokenId) public {
         _safeMint(to, tokenId);
         remainingTokenIds.remove(tokenId);
-    }
-
-    function burn(uint256 tokenId) public {
-        _burn(tokenId);
     }
 
     function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
@@ -65,12 +67,23 @@ contract MockNFT is Initializable, AccessControlUpgradeable, ERC721EnumerableUpg
         }
     }
 
-    function remainingTokenURI() public view returns (uint256[] memory _tokenIds, string[] memory _tokenURIs) {
-        uint numTokens = remainingTokenIds.length();
-        _tokenIds = new uint256[](numTokens);
-        _tokenURIs = new string[](numTokens);
-        for (uint i = 0; i < numTokens; i++) {
-            _tokenIds[i] = remainingTokenIds.at(i);
+    function tokenURINumPages() public view returns (uint) {
+        uint quotient = remainingTokenIds.length().div(pageSize);
+        if (quotient.mul(pageSize) < remainingTokenIds.length()) {
+            quotient += 1;
+        }
+        return quotient;
+    }
+
+    function remainingTokenURI(uint pageIndex) public view returns (uint256[] memory _tokenIds, string[] memory _tokenURIs) {
+        uint startIndex = pageIndex * uint(pageSize);
+        require(startIndex < remainingTokenIds.length());
+        uint resultSize = remainingTokenIds.length() - startIndex;
+        resultSize = resultSize < uint(pageSize) ? resultSize : uint(pageSize);
+        _tokenIds = new uint256[](resultSize);
+        _tokenURIs = new string[](resultSize);
+        for (uint i = 0; i < resultSize; i++) {
+            _tokenIds[i] = remainingTokenIds.at(startIndex + i);
             _tokenURIs[i] = tokenURIs[_tokenIds[i]];
         }
     }
