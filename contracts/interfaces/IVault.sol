@@ -8,5 +8,5 @@ interface IVault {
 
     function arbitrageurBurnSynth(uint synthBurned) external;
 
-    function userLiquidateETH(address account, uint synthAmount) external payable;
+    function userLiquidateETH(address account, uint synthAmount) external;
 }

@@ -47,10 +47,6 @@ describe("#MockWETH", function () {
       ethers.utils.parseEther("270"),
       ethers.utils.parseEther("0.001")
     );
-    await WETH.connect(owner).approve(
-      WETH.address,
-      ethers.utils.parseEther("20")
-    );
     await WETH.connect(owner).withdraw(ethers.utils.parseEther("20"));
     expect(await WETH.balanceOf(owner.address)).to.equal(
       ethers.utils.parseEther("10")

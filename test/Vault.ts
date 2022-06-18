@@ -120,7 +120,7 @@ describe("#Vault", function () {
         await vault
           .connect(minter)
           .userMintSynthETH(collateralRatio, { value: mintDeposit });
-        expect(await getEthBalance(vault.address)).to.equal(postDeposit);
+        expect(await WETH.balanceOf(vault.address)).to.equal(postDeposit);
         expect(await synth.balanceOf(minterAddress)).to.equal(postDebt);
         expect(await reserve.getMinterDebtETH(minterAddress)).to.equal(
           postDebt
@@ -170,7 +170,7 @@ describe("#Vault", function () {
       .approve(vault.address, BigNumber.from(20).mul(unit));
     await vault.connect(minter).userBurnSynthETH();
 
-    expect(await getEthBalance(vault.address)).to.equal(
+    expect(await WETH.balanceOf(vault.address)).to.equal(
       BigNumber.from(0).mul(unit)
     );
     expect(await synth.balanceOf(minterAddress)).to.equal(
@@ -218,7 +218,7 @@ describe("#Vault", function () {
       minterDeposit: BigNumber,
       minterDebt: BigNumber
     ) {
-      expect(await getEthBalance(vault.address)).to.equal(vaultBalance);
+      expect(await WETH.balanceOf(vault.address)).to.equal(vaultBalance);
       expect(await synth.balanceOf(minterAddress)).to.equal(minterDebt);
       expect(await reserve.getMinterDebtETH(minterAddress)).to.equal(
         minterDebt
@@ -388,7 +388,7 @@ describe("#Vault", function () {
       BigNumber.from(0).mul(unit)
     );
 
-    expect(await getEthBalance(vault.address)).to.equal(
+    expect(await WETH.balanceOf(vault.address)).to.equal(
       BigNumber.from(300).mul(unit)
     );
     expect(
@@ -404,7 +404,7 @@ describe("#Vault", function () {
     expect(await reserve.getMinterDepositETH(minterAddress)).to.equal(
       BigNumber.from(0).mul(unit)
     );
-    expect(await getEthBalance(vault.address)).to.equal(
+    expect(await WETH.balanceOf(vault.address)).to.equal(
       BigNumber.from(0).mul(unit)
     );
     expect(
@@ -416,7 +416,7 @@ describe("#Vault", function () {
     ).to.equal(true);
   });
 
-  describe("User mint synth sETH", async function () {
+  describe("User mint synth WETH", async function () {
     let minter: SignerWithAddress;
     let minterAddress: string;
 
@@ -488,7 +488,7 @@ describe("#Vault", function () {
     });
   });
 
-  it("User burn synth sETH", async function () {
+  it("User burn synth WETH", async function () {
     const liquidationPenalty = ethers.utils.parseUnits("1.2", decimal);
     const minCollateralRatio = ethers.utils.parseUnits("1.5", decimal);
     const [_, minter] = await ethers.getSigners();
@@ -535,7 +535,7 @@ describe("#Vault", function () {
     );
   });
 
-  describe("User manage synth sETH", async function () {
+  describe("User manage synth WETH", async function () {
     let minter: SignerWithAddress;
     let minterAddress: string;
 
@@ -700,10 +700,13 @@ describe("#Vault", function () {
     });
   });
 
-  it("User liquidate sETH", async function () {
+  it("User liquidate WETH", async function () {
     const liquidationPenalty = ethers.utils.parseUnits("1.2", decimal);
     const minCollateralRatio = ethers.utils.parseUnits("1.5", decimal);
-    const [_, minter, liquidator] = await ethers.getSigners();
+    const [owner, minter, liquidator] = await ethers.getSigners();
+    await WETH.connect(owner).setFreeMintLimit(
+      ethers.utils.parseEther("10000")
+    );
     await setUp(
       minCollateralRatio,
       liquidationPenalty,

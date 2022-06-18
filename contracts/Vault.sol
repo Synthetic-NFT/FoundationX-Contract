@@ -87,21 +87,22 @@ contract Vault is IVault, AccessControlUpgradeable, UUPSUpgradeable, ERC721Holde
     function arbitrageurMintSynth() external override onlyRole(ARBITRAGEUR_ROLE) payable lock {
         uint synthMinted = msg.value.divideDecimal(synth.getSynthPriceToEth());
         require(synthMinted <= arbitrageurBurnedSynth, ERR_NOT_ENOUGH_SYNTH_TO_MINT);
+        IWETH(WETHAddress).deposit{value: msg.value}();
         synth.mint(msg.sender, synthMinted);
     }
 
     function arbitrageurBurnSynth(uint synthBurned) override external onlyRole(ARBITRAGEUR_ROLE) lock {
         uint ethRedeemed = synthBurned.multiplyDecimal(synth.getSynthPriceToEth());
-        require(address(this).balance >= ethRedeemed, ERR_NOT_ENOUGH_ETH_TO_REDEEM);
+        require(IWETH(WETHAddress).balanceOf(address(this)) >= ethRedeemed, ERR_NOT_ENOUGH_ETH_TO_REDEEM);
         arbitrageurBurnedSynth += synthBurned;
         synth.burn(msg.sender, synthBurned);
+        IWETH(WETHAddress).withdraw(ethRedeemed);
         payable(msg.sender).transfer(ethRedeemed);
     }
 
     function userMintSynthETH(uint targetCollateralRatio) external payable lock {
         IWETH(WETHAddress).deposit{value: msg.value}();
-        reserve.addMinterDepositETH(msg.sender, msg.value);
-        synth.mintWithETH(msg.sender, msg.value.divideDecimal(targetCollateralRatio.multiplyDecimal(synth.getSynthPriceToEth())));
+        internalUserMintSynth(targetCollateralRatio, msg.value);
     }
 
     function userMintSynthWETH(uint targetCollateralRatio, uint targetDeposit) external lock {
@@ -109,14 +110,14 @@ contract Vault is IVault, AccessControlUpgradeable, UUPSUpgradeable, ERC721Holde
         internalUserMintSynth(targetCollateralRatio, targetDeposit);
     }
 
-    function internalUserMintSynth(uint targetCollateralRatio, uint targetDeposit) internal lock {
+    function internalUserMintSynth(uint targetCollateralRatio, uint targetDeposit) internal {
         checkTargetCollateralRatio(targetCollateralRatio);
         reserve.addMinterDepositETH(msg.sender, targetDeposit);
         synth.mintWithETH(msg.sender, targetDeposit.divideDecimal(targetCollateralRatio.multiplyDecimal(synth.getSynthPriceToEth())));
     }
 
     function userBurnSynthETH() external lock {
-        uint redeemAmount = internalUserManageSynthETH(reserve.getMinCollateralRatio(), 0);
+        uint redeemAmount = internalUserManageSynth(reserve.getMinCollateralRatio(), 0);
         if (redeemAmount > 0) {
             IWETH(WETHAddress).withdraw(redeemAmount);
             payable(msg.sender).transfer(redeemAmount);
@@ -124,7 +125,7 @@ contract Vault is IVault, AccessControlUpgradeable, UUPSUpgradeable, ERC721Holde
     }
 
     function userBurnSynthWETH() external lock {
-        uint redeemAmount = internalUserManageSynthETH(reserve.getMinCollateralRatio(), 0);
+        uint redeemAmount = internalUserManageSynth(reserve.getMinCollateralRatio(), 0);
         if (redeemAmount > 0) {
             IWETH(WETHAddress).transfer(msg.sender, redeemAmount);
         }
@@ -134,9 +135,11 @@ contract Vault is IVault, AccessControlUpgradeable, UUPSUpgradeable, ERC721Holde
         uint originalDeposit = reserve.getMinterDepositETH(msg.sender);
         if (targetDeposit > originalDeposit) {
             require(originalDeposit + msg.value == targetDeposit, ERR_INVALID_TARGET_DEPOSIT);
+            IWETH(WETHAddress).deposit{value: msg.value}();
         }
-        uint redeemAmount = internalUserManageSynthETH(targetCollateralRatio, targetDeposit);
+        uint redeemAmount = internalUserManageSynth(targetCollateralRatio, targetDeposit);
         if (redeemAmount > 0) {
+            IWETH(WETHAddress).withdraw(redeemAmount);
             payable(msg.sender).transfer(redeemAmount);
         }
     }
@@ -146,13 +149,13 @@ contract Vault is IVault, AccessControlUpgradeable, UUPSUpgradeable, ERC721Holde
         if (targetDeposit > originalDeposit) {
             IWETH(WETHAddress).transferFrom(msg.sender, address(this), targetDeposit - originalDeposit);
         }
-        uint redeemAmount = internalUserManageSynthETH(targetCollateralRatio, targetDeposit);
+        uint redeemAmount = internalUserManageSynth(targetCollateralRatio, targetDeposit);
         if (redeemAmount > 0) {
             IWETH(WETHAddress).transfer(msg.sender, redeemAmount);
         }
     }
 
-    function internalUserManageSynthETH(uint targetCollateralRatio, uint targetDeposit) private returns (uint redeemAmount) {
+    function internalUserManageSynth(uint targetCollateralRatio, uint targetDeposit) private returns (uint redeemAmount) {
         checkTargetCollateralRatio(targetCollateralRatio);
         uint originalDeposit = reserve.getMinterDepositETH(msg.sender);
 
@@ -173,7 +176,7 @@ contract Vault is IVault, AccessControlUpgradeable, UUPSUpgradeable, ERC721Holde
         }
     }
 
-    function userLiquidateETH(address account, uint synthAmount) external override payable lock {
+    function userLiquidateETH(address account, uint synthAmount) external override lock {
         (uint totalRedeemed, uint amountToLiquidate) = synth.liquidateDelinquentAccount(account, synthAmount, msg.sender);
         IWETH(WETHAddress).withdraw(totalRedeemed);
         payable(msg.sender).transfer(totalRedeemed);
