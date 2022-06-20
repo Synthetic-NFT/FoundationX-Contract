@@ -176,6 +176,10 @@ contract Vault is IVault, AccessControlUpgradeable, UUPSUpgradeable, ERC721Holde
         }
     }
 
+    function setNFTAddress(address _NFTAddress) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        NFTAddress = _NFTAddress;
+    }
+
     function userLiquidateETH(address account, uint synthAmount) external override lock {
         (uint totalRedeemed, uint amountToLiquidate) = synth.liquidateDelinquentAccount(account, synthAmount, msg.sender);
         IWETH(WETHAddress).withdraw(totalRedeemed);

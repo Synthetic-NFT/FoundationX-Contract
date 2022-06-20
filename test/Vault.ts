@@ -30,6 +30,7 @@ describe("#Vault", function () {
   let WETH: MockWETH;
   let synth: Synth;
   let NFT: MockNFT;
+  let NFT2: MockNFT;
   let vault: Vault;
   let decimal: number;
   let unit: BigNumber;
@@ -58,6 +59,7 @@ describe("#Vault", function () {
     );
     synth = await deploySynth(reserve, oracle, tokenName, tokenSymbol);
     NFT = await deployMockNFT(NFTName, NFTSymbol);
+    NFT2 = await deployMockNFT(NFTName, NFTSymbol);
     vault = await deployVault(
       librarySafeDecimalMath,
       synth,
@@ -778,6 +780,17 @@ describe("#Vault", function () {
       minterAddress = minter.address;
       await NFT.safeMint(minterAddress, BigNumber.from(0));
       await NFT.safeMint(minterAddress, BigNumber.from(1));
+    });
+
+    it("Check and update NFT Address", async function () {
+      const [owner] = await ethers.getSigners();
+      await expect(
+          await vault.connect(owner).NFTAddress()
+      ).to.be.eql(NFT.address);
+      await vault.connect(owner).setNFTAddress(NFT2.address);
+      await expect(
+          await vault.connect(owner).NFTAddress()
+      ).to.be.eql(NFT2.address);
     });
 
     it("Not NFT owner", async function () {
