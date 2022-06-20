@@ -23,7 +23,6 @@ contract Vault is IVault, AccessControlUpgradeable, UUPSUpgradeable, ERC721Holde
 
     Synth public synth;
     Reserve public reserve;
-    address WETHAddress;
     uint arbitrageurBurnedSynth;
 
     address public NFTAddress;
@@ -43,6 +42,7 @@ contract Vault is IVault, AccessControlUpgradeable, UUPSUpgradeable, ERC721Holde
     string public constant ERR_WITHIN_LOCKING_PERIOD = "Within locking period";
 
     bool locked;
+    address WETHAddress;
 
     event Received(address, uint);
 
