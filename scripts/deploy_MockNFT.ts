@@ -46,7 +46,7 @@ async function main() {
     const vault = await Vault.attach(vaultAddresses[i]);
     const NFT = await deployMockNFT(tokenName, tokenSymbol);
     console.log(tokenName, "NFT deployed to:", NFT.address);
-    await vault.setNFTAddress(NFT.address);
+    await vault.connect(owner).setNFTAddress(NFT.address);
   }
 
 }
