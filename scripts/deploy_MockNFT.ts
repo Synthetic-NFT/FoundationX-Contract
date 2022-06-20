@@ -33,9 +33,13 @@ async function main() {
 
   const [owner] = await ethers.getSigners();
   console.log("Owner address", owner.address);
-
-  const Vault = await ethers.getContractFactory("Vault");
-
+  const safeDecimalMath = await deploySafeDecimalMath();
+  console.log("SafeDecimalMath deployed to:", safeDecimalMath.address);
+  const Vault = await ethers.getContractFactory("Vault", {
+    libraries: {
+      SafeDecimalMath: safeDecimalMath.address,
+    },
+  });
   for (let i = 0; i < tokenNames.length; i++) {
     const tokenName = tokenNames[i];
     const tokenSymbol = tokenSymbols[i];
