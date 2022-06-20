@@ -30,7 +30,8 @@ async function main() {
     console.log("Upgrading Vault...");
     await upgrades.upgradeProxy(
         vaultAddresses[i],
-        Vault
+        Vault,
+        { unsafeAllowLinkedLibraries: true }
     );
     console.log("Vault upgraded");
   }
