@@ -7,6 +7,7 @@
 // @ts-ignore
 const { ethers, upgrades } = require("hardhat");
 // eslint-disable-next-line node/no-extraneous-require
+const vaultAddresses = ["0x0E801D84Fa97b50751Dbf25036d067dCf18858bF", "0x5f3f1dBD7B74C6B46e8c44f98792A1dAf8d69154", "0xFD471836031dc5108809D173A067e8486B9047A3"];
 
 async function main() {
   // Hardhat always runs the compile task when running scripts with its command
@@ -20,13 +21,20 @@ async function main() {
 
   const [owner] = await ethers.getSigners();
   console.log("Owner address", owner.address);
-  const Factory = await ethers.getContractFactory("Factory");
-  console.log("Upgrading Factory...");
-  await upgrades.upgradeProxy(
-    "0x9E545E3C0baAB3E08CdfD552C960A1050f373042",
-    Factory
-  );
-  console.log("Factory upgraded");
+  const Vault = await ethers.getContractFactory("Vault", {
+    libraries: {
+      SafeDecimalMath: "0x9e7F7d0E8b8F38e3CF2b3F7dd362ba2e9E82baa4",
+    },
+  });
+  for (let i = 0; i < vaultAddresses.length; i++) {
+    console.log("Upgrading Vault...");
+    await upgrades.upgradeProxy(
+        vaultAddresses[i],
+        Vault
+    );
+    console.log("Vault upgraded");
+  }
+
 }
 
 // We recommend this pattern to be able to use async/await everywhere
