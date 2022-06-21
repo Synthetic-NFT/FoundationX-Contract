@@ -71,7 +71,7 @@ describe("#Factory", function () {
   };
 
   beforeEach(async function () {
-    const [owner, NFTContract] = await ethers.getSigners();
+    const [owner, NFTContract, NFTContract2] = await ethers.getSigners();
     ownerAddress = owner.address;
     librarySafeDecimalMath = await deploySafeDecimalMath();
     decimal = await librarySafeDecimalMath.decimals();
@@ -90,7 +90,7 @@ describe("#Factory", function () {
       ethers.utils.parseUnits("1.2", decimal),
       tokenName2,
       tokenSymbol2,
-      NFTContract.address,
+      NFTContract2.address,
       BigNumber.from(0).mul(unit)
     );
     factory = await deployFactory();
@@ -124,12 +124,15 @@ describe("#Factory", function () {
   });
 
   it("List token address info", async function () {
+    const [_, NFTContract, NFTContract2] = await ethers.getSigners();
+
     expect(await factory.listTokenAddressInfo()).to.eql([
       [tokenName1, tokenName2],
       [tokenSymbol1, tokenSymbol2],
       [vault1.address, vault2.address],
       [synth1.address, synth2.address],
       [reserve1.address, reserve2.address],
+      [NFTContract.address, NFTContract2.address],
     ]);
     await factory.delistVaults([tokenName1]);
     expect(await factory.listTokenAddressInfo()).to.eql([
@@ -138,6 +141,7 @@ describe("#Factory", function () {
       [vault2.address],
       [synth2.address],
       [reserve2.address],
+      [NFTContract2.address],
     ]);
   });
 });

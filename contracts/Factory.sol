@@ -82,12 +82,20 @@ contract Factory is AccessControlUpgradeable, UUPSUpgradeable {
         return (debtETH, debtNFT, tokenPrices);
     }
 
-    function listTokenAddressInfo() public view returns (string[] memory tokenNames, string[] memory tokenSymbols, address[] memory vaultAddresses, address[] memory synthAddresses, address[] memory reserveAddresses) {
+    function listTokenAddressInfo() public view returns (
+        string[] memory tokenNames,
+        string[] memory tokenSymbols,
+        address[] memory vaultAddresses,
+        address[] memory synthAddresses,
+        address[] memory reserveAddresses,
+        address[] memory nftAddresses
+    ) {
         tokenNames = new string[](numListedTokens);
         tokenSymbols = new string[](numListedTokens);
         vaultAddresses = new address[](numListedTokens);
         synthAddresses = new address[](numListedTokens);
         reserveAddresses = new address[](numListedTokens);
+        nftAddresses = new address[](numListedTokens);
         uint result_i = 0;
         for (uint8 i = 0; i < listedTokens.length; i++) {
             if (result_i>=numListedTokens) {
@@ -101,6 +109,7 @@ contract Factory is AccessControlUpgradeable, UUPSUpgradeable {
                 vaultAddresses[result_i] = address(vault);
                 synthAddresses[result_i] = address(vault.synth());
                 reserveAddresses[result_i] = address(vault.reserve());
+                nftAddresses[result_i] = address(vault.NFTAddress());
                 result_i += 1;
             }
         }

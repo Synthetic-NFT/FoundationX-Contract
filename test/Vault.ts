@@ -315,12 +315,14 @@ describe("#Vault", function () {
       await synth
         .connect(minter)
         .approve(vault.address, BigNumber.from(2).mul(unit));
+      console.log("aaaaa", await WETH.balanceOf(vault.address));
       await vault
         .connect(minter)
         .userManageSynthETH(
           ethers.utils.parseUnits("1.6", decimal),
           BigNumber.from(160).mul(unit)
         );
+      console.log("aaaaa", await WETH.balanceOf(vault.address));
       const minterBalance = BigNumber.from(240).mul(unit);
       const minterDebt = BigNumber.from(10).mul(unit);
       const minterDeposit = BigNumber.from(160).mul(unit);
