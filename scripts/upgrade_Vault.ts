@@ -8,7 +8,7 @@
 const { ethers, upgrades } = require("hardhat");
 // eslint-disable-next-line node/no-extraneous-require
 const vaultAddresses = ["0x0E801D84Fa97b50751Dbf25036d067dCf18858bF", "0x5f3f1dBD7B74C6B46e8c44f98792A1dAf8d69154", "0xFD471836031dc5108809D173A067e8486B9047A3"];
-const WETHAddress = ["0xE2b5bDE7e80f89975f7229d78aD9259b2723d11F"];
+const WETHAddress = "0xE2b5bDE7e80f89975f7229d78aD9259b2723d11F";
 async function main() {
   // Hardhat always runs the compile task when running scripts with its command
   // line interface.
