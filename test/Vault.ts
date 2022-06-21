@@ -28,6 +28,7 @@ describe("#Vault", function () {
   let reserve: Reserve;
   let oracle: MockOracle;
   let WETH: MockWETH;
+  let WETH2: MockWETH;
   let synth: Synth;
   let NFT: MockNFT;
   let NFT2: MockNFT;
@@ -45,6 +46,7 @@ describe("#Vault", function () {
     unit = await librarySafeDecimalMath.UNIT();
     oracle = await deployMockOracle();
     WETH = await deployMockWETH("WETH", "WETH");
+    WETH2 = await deployMockWETH("WETH", "WETH");
   });
 
   const setUp = async function (
@@ -791,6 +793,17 @@ describe("#Vault", function () {
       await expect(
           await vault.connect(owner).NFTAddress()
       ).to.be.eql(NFT2.address);
+    });
+
+    it("Check and update WETH Address", async function () {
+      const [owner] = await ethers.getSigners();
+      await expect(
+          await vault.connect(owner).WETHAddress()
+      ).to.be.eql(WETH.address);
+      await vault.connect(owner).setWETHAddress(WETH2.address);
+      await expect(
+          await vault.connect(owner).WETHAddress()
+      ).to.be.eql(WETH2.address);
     });
 
     it("Not NFT owner", async function () {

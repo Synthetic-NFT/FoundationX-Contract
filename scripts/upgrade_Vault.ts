@@ -34,7 +34,7 @@ async function main() {
         { unsafeAllowLinkedLibraries: true }
     );
     console.log("Vault upgraded. Setting WETH...");
-    const vault = Vault.attach(vaultAddresses[i]);
+    const vault = await Vault.attach(vaultAddresses[i]);
     await vault.setWETHAddress(WETHAddress);
   }
 
