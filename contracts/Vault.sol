@@ -42,7 +42,7 @@ contract Vault is IVault, AccessControlUpgradeable, UUPSUpgradeable, ERC721Holde
     string public constant ERR_WITHIN_LOCKING_PERIOD = "Within locking period";
 
     bool locked;
-    address WETHAddress;
+    address public WETHAddress;
 
     event Received(address, uint);
 
@@ -178,6 +178,10 @@ contract Vault is IVault, AccessControlUpgradeable, UUPSUpgradeable, ERC721Holde
 
     function setNFTAddress(address _NFTAddress) public onlyRole(DEFAULT_ADMIN_ROLE) {
         NFTAddress = _NFTAddress;
+    }
+
+    function setWETHAddress(address _WETHAddress) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        WETHAddress = _WETHAddress;
     }
 
     function userLiquidateETH(address account, uint synthAmount) external override lock {
