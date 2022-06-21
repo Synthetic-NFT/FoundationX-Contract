@@ -8,7 +8,7 @@
 const { ethers, upgrades } = require("hardhat");
 // eslint-disable-next-line node/no-extraneous-require
 const vaultAddresses = ["0x0E801D84Fa97b50751Dbf25036d067dCf18858bF", "0x5f3f1dBD7B74C6B46e8c44f98792A1dAf8d69154", "0xFD471836031dc5108809D173A067e8486B9047A3"];
-
+const WETHAddress = ["0x21dF544947ba3E8b3c32561399E88B52Dc8b2823"];
 async function main() {
   // Hardhat always runs the compile task when running scripts with its command
   // line interface.
@@ -33,7 +33,9 @@ async function main() {
         Vault,
         { unsafeAllowLinkedLibraries: true }
     );
-    console.log("Vault upgraded");
+    console.log("Vault upgraded. Setting WETH...");
+    const vault = Vault.attach(vaultAddresses[i]);
+    await vault.setWETHAddress(WETHAddress);
   }
 
 }
