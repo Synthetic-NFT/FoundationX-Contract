@@ -35,7 +35,7 @@ async function main() {
     );
     console.log("Vault upgraded. Setting WETH...");
     const vault = await Vault.attach(vaultAddresses[i]);
-    await vault.setWETHAddress(WETHAddress);
+    await vault.connect(owner).setWETHAddress(WETHAddress);
   }
 
 }
