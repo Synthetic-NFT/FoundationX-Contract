@@ -9,24 +9,25 @@ import { getEthBalance } from "./shared/address";
 describe("#MockWETH", function () {
   let WETH: MockWETH;
   let owner: SignerWithAddress;
+  let user: SignerWithAddress;
   const name = "WETH";
   const symbol = "WETH";
 
   beforeEach(async function () {
     WETH = await deployMockWETH(name, symbol);
-    [owner] = await ethers.getSigners();
+    [owner, user] = await ethers.getSigners();
   });
 
   it("Free mint", async function () {
-    await WETH.mintFree(owner.address, ethers.utils.parseEther("900"));
-    expect(await WETH.balanceOf(owner.address)).to.equal(
+    await WETH.mintFree(user.address, ethers.utils.parseEther("900"));
+    expect(await WETH.balanceOf(user.address)).to.equal(
       ethers.utils.parseEther("900")
     );
-    expect(await WETH.mintableFree(owner.address)).to.equal(
+    expect(await WETH.mintableFree(user.address)).to.equal(
       ethers.utils.parseEther("100")
     );
     await expect(
-      WETH.mintFree(owner.address, ethers.utils.parseEther("200"))
+      WETH.mintFree(user.address, ethers.utils.parseEther("200"))
     ).to.be.revertedWith(await WETH.ERR_EXCEED_FREE_MINT_LIMIT());
   });
 

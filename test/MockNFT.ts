@@ -49,7 +49,28 @@ describe("#MockNFT", function () {
       new Set([BigNumber.from(4), BigNumber.from(2), BigNumber.from(6)])
     );
     expect(new Set(remainingURIs)).to.eql(new Set(["4.png", "2.png", "6.png"]));
-
     expect(await NFT.tokenURI(BigNumber.from(2))).to.equal("2.png");
+  });
+
+  it("Batch mint NFTs", async function () {
+    const tokenIds = [
+      BigNumber.from(1),
+      BigNumber.from(4),
+      BigNumber.from(2),
+      BigNumber.from(5),
+      BigNumber.from(6),
+    ];
+    const tokenURIs = ["1.png", "4.png", "2.png", "5.png", "6.png"];
+    await NFT.batchSetTokenURI(tokenIds, tokenURIs);
+    await NFT.connect(owner).setPageSize(3);
+
+    const [minter] = await ethers.getSigners();
+    await NFT.safeBatchMint(minter.address, [1, 4, 2]);
+    expect(await NFT.ownerOf(BigNumber.from(1))).to.equal(minter.address);
+    expect(await NFT.ownerOf(BigNumber.from(4))).to.equal(minter.address);
+    expect(await NFT.ownerOf(BigNumber.from(2))).to.equal(minter.address);
+    await expect(NFT.safeBatchMint(minter.address, [1])).to.be.revertedWith(
+      "ERC721: token already minted"
+    );
   });
 });
